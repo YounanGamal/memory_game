@@ -1,12 +1,28 @@
-enum GameState { idle, preview, playing, comparing, finished }
+enum GameState { idle, preview, playing, comparing, finished, lost }
+
+enum GameMode {
+  classic(label: 'Classic', details: 'Pure memory challenge'),
+  assist(label: 'Assist', details: '1 hint + 1 auto match'),
+  timeAttack(label: 'Time Attack', details: 'Beat the countdown');
+
+  final String label;
+  final String details;
+
+  const GameMode({required this.label, required this.details});
+}
 
 enum GameLevel {
-  easy(gridSize: 2, previewDuration: 3),
-  medium(gridSize: 4, previewDuration: 2),
-  hard(gridSize: 6, previewDuration: 1);
+  easy(gridSize: 2, previewDuration: 3, timeLimit: 60),
+  medium(gridSize: 4, previewDuration: 2, timeLimit: 90),
+  hard(gridSize: 6, previewDuration: 1, timeLimit: 120);
 
   final int gridSize;
   final int previewDuration;
+  final int timeLimit;
 
-  const GameLevel({required this.gridSize, required this.previewDuration});
+  const GameLevel({
+    required this.gridSize,
+    required this.previewDuration,
+    required this.timeLimit,
+  });
 }

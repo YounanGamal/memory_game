@@ -22,15 +22,18 @@ class _GameScreenState extends State<GameScreen> {
   @override
   void initState() {
     super.initState();
-    // Listen for win state
     ever(controller.state, (state) {
       if (state == GameState.finished) {
-        _showWinDialog();
+        _showEndDialog(didWin: true);
+      } else if (state == GameState.lost) {
+        _showEndDialog(didWin: false);
       }
     });
   }
 
-  void _showWinDialog() {
+  void _showEndDialog({required bool didWin}) {
+    if (Get.isDialogOpen == true) return;
+
     Get.dialog(
       Dialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
@@ -43,10 +46,10 @@ class _GameScreenState extends State<GameScreen> {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const Text('🎉', style: TextStyle(fontSize: 64)),
+              Text(didWin ? '🎉' : '⏱️', style: const TextStyle(fontSize: 64)),
               const SizedBox(height: 16),
               Text(
-                'Congratulations!',
+                didWin ? 'Congratulations!' : 'Time is up',
                 style: GoogleFonts.outfit(
                   fontSize: 24,
                   fontWeight: FontWeight.bold,
@@ -55,13 +58,20 @@ class _GameScreenState extends State<GameScreen> {
               ),
               const SizedBox(height: 8),
               Text(
-                'You cleared the board!',
+                didWin
+                    ? 'You cleared the board!'
+                    : 'Try again and move faster.',
+                textAlign: TextAlign.center,
                 style: GoogleFonts.outfit(color: AppColors.textGrey),
               ),
               const SizedBox(height: 24),
               _buildResultRow(
-                'Time',
-                _formatTime(controller.secondsElapsed.value),
+                controller.isTimeAttack ? 'Time Left' : 'Time',
+                _formatTime(
+                  controller.isTimeAttack
+                      ? controller.remainingSeconds.value
+                      : controller.secondsElapsed.value,
+                ),
               ),
               const SizedBox(height: 12),
               _buildResultRow('Moves', '${controller.moves.value}'),
@@ -76,8 +86,8 @@ class _GameScreenState extends State<GameScreen> {
               const SizedBox(height: 32),
               GestureDetector(
                 onTap: () {
-                  Get.back(); // Close dialog
-                  Get.back(); // Back to start screen
+                  Get.back();
+                  Get.back();
                 },
                 child: Container(
                   width: double.infinity,
@@ -88,7 +98,7 @@ class _GameScreenState extends State<GameScreen> {
                   ),
                   child: Center(
                     child: Text(
-                      'PLAY AGAIN',
+                      didWin ? 'PLAY AGAIN' : 'TRY AGAIN',
                       style: GoogleFonts.outfit(
                         fontWeight: FontWeight.bold,
                         color: Colors.white,
@@ -136,6 +146,10 @@ class _GameScreenState extends State<GameScreen> {
             children: [
               _buildTopBar(controller),
               Expanded(child: _buildGrid(controller)),
+              if (controller.hasAssists) ...[
+                _buildAssistsRow(controller),
+                const SizedBox(height: 16),
+              ],
               _buildBottomBar(controller),
               const SizedBox(height: 20),
             ],
@@ -157,8 +171,8 @@ class _GameScreenState extends State<GameScreen> {
       ),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Back Button
           Row(
             children: [
               _buildCircleAction(
@@ -168,7 +182,10 @@ class _GameScreenState extends State<GameScreen> {
               const SizedBox(width: 10),
               _buildCircleAction(
                 icon: Icons.refresh_rounded,
-                onTap: () => controller.startGame(controller.level.value),
+                onTap: () => controller.startGame(
+                  controller.level.value,
+                  controller.mode.value,
+                ),
               ),
               const SizedBox(width: 10),
               Obx(
@@ -182,8 +199,6 @@ class _GameScreenState extends State<GameScreen> {
               ),
             ],
           ),
-
-          // Progress & Score
           Flexible(
             child: Obx(
               () => Column(
@@ -252,6 +267,121 @@ class _GameScreenState extends State<GameScreen> {
     );
   }
 
+  Widget _buildAssistsRow(GameController controller) {
+    return Obx(() {
+      return Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          _buildPremiumAssistButton(
+            icon: Icons.visibility_rounded,
+            title: 'Hint',
+            count: controller.hintsLeft.value,
+            cooldown: controller.hintCooldown.value,
+            isEnabled: controller.canUseHint,
+            onTap: controller.useHint,
+            gradient: const LinearGradient(colors: [Colors.blue, Colors.lightBlueAccent]),
+          ),
+          const SizedBox(width: 24),
+          _buildPremiumAssistButton(
+            icon: Icons.auto_awesome_rounded,
+            title: 'Auto Match',
+            count: controller.autoMatchesLeft.value,
+            cooldown: controller.autoMatchCooldown.value,
+            isEnabled: controller.canUseAutoMatch,
+            onTap: controller.useAutoMatch,
+            gradient: const LinearGradient(colors: [Colors.purple, Colors.purpleAccent]),
+          ),
+        ],
+      );
+    });
+  }
+
+  Widget _buildPremiumAssistButton({
+    required IconData icon,
+    required String title,
+    required int count,
+    required int cooldown,
+    required bool isEnabled,
+    required VoidCallback onTap,
+    required Gradient gradient,
+  }) {
+    final bool isEmpty = count <= 0;
+    
+    return GestureDetector(
+      onTap: isEnabled ? onTap : null,
+      child: AnimatedOpacity(
+        duration: const Duration(milliseconds: 200),
+        opacity: isEmpty ? 0.4 : 1.0,
+        child: Column(
+          children: [
+            Stack(
+              clipBehavior: Clip.none,
+              children: [
+                Container(
+                  width: 56,
+                  height: 56,
+                  decoration: BoxDecoration(
+                    gradient: gradient,
+                    shape: BoxShape.circle,
+                    boxShadow: [
+                      BoxShadow(
+                        color: gradient.colors.last.withValues(alpha: 0.3),
+                        blurRadius: 10,
+                        offset: const Offset(0, 4),
+                      ),
+                    ],
+                  ),
+                  child: Center(
+                    child: cooldown > 0
+                        ? Text(
+                            '$cooldown',
+                            style: GoogleFonts.outfit(
+                              fontSize: 22,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.white,
+                            ),
+                          )
+                        : Icon(icon, color: Colors.white, size: 28),
+                  ),
+                ),
+                if (!isEmpty)
+                  Positioned(
+                    top: -4,
+                    right: -4,
+                    child: Container(
+                      padding: const EdgeInsets.all(6),
+                      decoration: BoxDecoration(
+                        color: AppColors.accentPink,
+                        shape: BoxShape.circle,
+                        border: Border.all(color: Colors.white, width: 2),
+                      ),
+                      child: Text(
+                        '$count',
+                        style: GoogleFonts.outfit(
+                          fontSize: 12,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.white,
+                        ),
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Text(
+              title,
+              style: GoogleFonts.outfit(
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+                color: AppColors.textGrey,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   Widget _buildGrid(GameController controller) {
     return Stack(
       children: [
@@ -283,8 +413,6 @@ class _GameScreenState extends State<GameScreen> {
             ),
           );
         }),
-
-        // Combo Indicator
         Obx(() {
           if (controller.combo.value <= 1) return const SizedBox.shrink();
           return Positioned(
@@ -334,22 +462,39 @@ class _GameScreenState extends State<GameScreen> {
         mainAxisAlignment: MainAxisAlignment.spaceAround,
         children: [
           _buildStat(
-            'TIME',
-            Obx(
-              () => Text(
-                _formatTime(controller.secondsElapsed.value),
+            controller.isTimeAttack ? 'LEFT' : 'TIME',
+            Obx(() {
+              final seconds = controller.isTimeAttack
+                  ? controller.remainingSeconds.value
+                  : controller.secondsElapsed.value;
+              final isDanger = controller.isTimeAttack && seconds <= 10;
+              final text = Text(
+                _formatTime(seconds),
                 style: GoogleFonts.outfit(
                   fontSize: screenWidth < 380 ? 16 : 18,
                   fontWeight: FontWeight.bold,
+                  color: isDanger ? Colors.redAccent : AppColors.textDark,
                 ),
-              ),
-            ),
+              );
+
+              return isDanger
+                  ? text
+                        .animate(onPlay: (controller) => controller.repeat())
+                        .scale(
+                          begin: const Offset(1, 1),
+                          end: const Offset(1.08, 1.08),
+                          duration: 450.ms,
+                        )
+                        .then()
+                        .scale(
+                          begin: const Offset(1.08, 1.08),
+                          end: const Offset(1, 1),
+                          duration: 450.ms,
+                        )
+                  : text;
+            }),
           ),
-          Container(
-            height: 30,
-            width: 1,
-            color: Colors.grey.withValues(alpha: 0.2),
-          ),
+          _divider(),
           _buildStat(
             'MOVES',
             Obx(
@@ -358,15 +503,12 @@ class _GameScreenState extends State<GameScreen> {
                 style: GoogleFonts.outfit(
                   fontSize: screenWidth < 380 ? 16 : 18,
                   fontWeight: FontWeight.bold,
+                  color: AppColors.textDark,
                 ),
               ),
             ),
           ),
-          Container(
-            height: 30,
-            width: 1,
-            color: Colors.grey.withValues(alpha: 0.2),
-          ),
+          _divider(),
           _buildStat(
             'BEST',
             Obx(
@@ -375,12 +517,21 @@ class _GameScreenState extends State<GameScreen> {
                 style: GoogleFonts.outfit(
                   fontSize: screenWidth < 380 ? 16 : 18,
                   fontWeight: FontWeight.bold,
+                  color: AppColors.textDark,
                 ),
               ),
             ),
           ),
         ],
       ),
+    );
+  }
+
+  Widget _divider() {
+    return Container(
+      height: 30,
+      width: 1,
+      color: Colors.grey.withValues(alpha: 0.2),
     );
   }
 
@@ -406,6 +557,4 @@ class _GameScreenState extends State<GameScreen> {
     int secs = seconds % 60;
     return '${mins.toString().padLeft(2, '0')}:${secs.toString().padLeft(2, '0')}';
   }
-
-  // Note: I will add the Win Dialog listener in the controller or here using ever()
 }

@@ -20,6 +20,7 @@ class _StartScreenState extends State<StartScreen> {
   final GameController controller = Get.put(GameController());
   final ThemeController themeController = Get.find<ThemeController>();
   GameLevel _selectedLevel = GameLevel.easy;
+  GameMode _selectedMode = GameMode.classic;
 
   @override
   Widget build(BuildContext context) {
@@ -27,7 +28,7 @@ class _StartScreenState extends State<StartScreen> {
       () => Scaffold(
         backgroundColor: AppColors.background,
         body: SafeArea(
-          child: Padding(
+          child: SingleChildScrollView(
             padding: const EdgeInsets.symmetric(horizontal: 24.0),
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
@@ -44,7 +45,7 @@ class _StartScreenState extends State<StartScreen> {
                     color: AppColors.accentPink,
                   ),
                 ),
-                const Spacer(),
+                const SizedBox(height: 28),
                 // Title
                 Text(
                   'Memory',
@@ -74,7 +75,7 @@ class _StartScreenState extends State<StartScreen> {
                   ),
                 ).animate().fadeIn(delay: 500.ms),
 
-                const SizedBox(height: 60),
+                const SizedBox(height: 44),
 
                 // Level Selection
                 Text(
@@ -117,11 +118,35 @@ class _StartScreenState extends State<StartScreen> {
                   ],
                 ).animate().fadeIn(delay: 600.ms).slideX(begin: 0.1, end: 0),
 
-                const Spacer(),
+                const SizedBox(height: 28),
+
+                Text(
+                  'Select Mode',
+                  style: GoogleFonts.outfit(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.textDark,
+                  ),
+                ),
+                const SizedBox(height: 14),
+                Column(
+                  children: GameMode.values.map((mode) {
+                    return Padding(
+                      padding: const EdgeInsets.only(bottom: 10),
+                      child: _ModeTile(
+                        mode: mode,
+                        isSelected: _selectedMode == mode,
+                        onTap: () => setState(() => _selectedMode = mode),
+                      ),
+                    );
+                  }).toList(),
+                ).animate().fadeIn(delay: 700.ms).slideY(begin: 0.08, end: 0),
+
+                const SizedBox(height: 22),
                 // Start Button
                 GestureDetector(
                       onTap: () async {
-                        controller.startGame(_selectedLevel);
+                        controller.startGame(_selectedLevel, _selectedMode);
                         Get.to(() => const GameScreen());
                       },
                       child: Container(
@@ -161,6 +186,80 @@ class _StartScreenState extends State<StartScreen> {
               ],
             ),
           ),
+        ),
+      ),
+    );
+  }
+}
+
+class _ModeTile extends StatelessWidget {
+  final GameMode mode;
+  final bool isSelected;
+  final VoidCallback onTap;
+
+  const _ModeTile({
+    required this.mode,
+    required this.isSelected,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final icon = switch (mode) {
+      GameMode.classic => Icons.sports_esports_rounded,
+      GameMode.assist => Icons.psychology_alt_rounded,
+      GameMode.timeAttack => Icons.timer_rounded,
+    };
+
+    return GestureDetector(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 220),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        decoration: BoxDecoration(
+          color: isSelected
+              ? AppColors.white
+              : AppColors.white.withValues(alpha: 0.62),
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(
+            color: isSelected ? AppColors.primaryPink : AppColors.border,
+            width: isSelected ? 2 : 1,
+          ),
+        ),
+        child: Row(
+          children: [
+            Icon(icon, color: AppColors.accentPink, size: 22),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    mode.label,
+                    style: GoogleFonts.outfit(
+                      color: AppColors.textDark,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 15,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    mode.details,
+                    style: GoogleFonts.outfit(
+                      color: AppColors.textGrey,
+                      fontSize: 12,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            if (isSelected)
+              Icon(
+                Icons.check_circle_rounded,
+                color: AppColors.primaryPink,
+                size: 20,
+              ),
+          ],
         ),
       ),
     );
