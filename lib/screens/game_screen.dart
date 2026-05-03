@@ -3,6 +3,7 @@ import 'package:flutter_animate/flutter_animate.dart';
 import 'package:get/get.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../controllers/game_controller.dart';
+import '../controllers/theme_controller.dart';
 import '../core/enums/game_enums.dart';
 import '../theme/app_colors.dart';
 import '../widgets/memory_card_widget.dart';
@@ -16,6 +17,7 @@ class GameScreen extends StatefulWidget {
 
 class _GameScreenState extends State<GameScreen> {
   final GameController controller = Get.find<GameController>();
+  final ThemeController themeController = Get.find<ThemeController>();
 
   @override
   void initState() {
@@ -35,7 +37,7 @@ class _GameScreenState extends State<GameScreen> {
         child: Container(
           padding: const EdgeInsets.all(32),
           decoration: BoxDecoration(
-            color: Colors.white,
+            color: AppColors.white,
             borderRadius: BorderRadius.circular(30),
           ),
           child: Column(
@@ -63,6 +65,8 @@ class _GameScreenState extends State<GameScreen> {
               ),
               const SizedBox(height: 12),
               _buildResultRow('Moves', '${controller.moves.value}'),
+              const SizedBox(height: 12),
+              _buildResultRow('Best Combo', 'x${controller.bestCombo.value}'),
               const SizedBox(height: 12),
               _buildResultRow(
                 'Final Score',
@@ -124,75 +128,126 @@ class _GameScreenState extends State<GameScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: AppColors.background,
-      body: SafeArea(
-        child: Column(
-          children: [
-            _buildTopBar(controller),
-            Expanded(child: _buildGrid(controller)),
-            _buildBottomBar(controller),
-            const SizedBox(height: 20),
-          ],
+    return Obx(
+      () => Scaffold(
+        backgroundColor: AppColors.background,
+        body: SafeArea(
+          child: Column(
+            children: [
+              _buildTopBar(controller),
+              Expanded(child: _buildGrid(controller)),
+              _buildBottomBar(controller),
+              const SizedBox(height: 20),
+            ],
+          ),
         ),
       ),
     );
   }
 
   Widget _buildTopBar(GameController controller) {
+    final screenWidth = MediaQuery.sizeOf(context).width;
+    final horizontalPadding = screenWidth < 380 ? 14.0 : 24.0;
+    final verticalPadding = screenWidth < 380 ? 12.0 : 24.0;
+
     return Padding(
-      padding: const EdgeInsets.all(24.0),
+      padding: EdgeInsets.symmetric(
+        horizontal: horizontalPadding,
+        vertical: verticalPadding,
+      ),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
           // Back Button
-          GestureDetector(
-            onTap: () => Get.back(),
-            child: Container(
-              padding: const EdgeInsets.all(12),
-              decoration: const BoxDecoration(
-                color: AppColors.white,
-                shape: BoxShape.circle,
+          Row(
+            children: [
+              _buildCircleAction(
+                icon: Icons.arrow_back_ios_new_rounded,
+                onTap: () => Get.back(),
               ),
-              child: const Icon(Icons.arrow_back_ios_new_rounded, size: 20),
-            ),
+              const SizedBox(width: 10),
+              _buildCircleAction(
+                icon: Icons.refresh_rounded,
+                onTap: () => controller.startGame(controller.level.value),
+              ),
+              const SizedBox(width: 10),
+              Obx(
+                () => _buildCircleAction(
+                  icon: themeController.isDarkMode.value
+                      ? Icons.light_mode_rounded
+                      : Icons.dark_mode_rounded,
+                  onTap: themeController.toggleTheme,
+                  iconColor: AppColors.accentPink,
+                ),
+              ),
+            ],
           ),
 
           // Progress & Score
-          Obx(
-            () => Column(
-              crossAxisAlignment: CrossAxisAlignment.end,
-              children: [
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 16,
-                    vertical: 8,
-                  ),
-                  decoration: BoxDecoration(
-                    color: AppColors.white,
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                  child: Text(
-                    'SCORE: ${controller.score.value}',
-                    style: GoogleFonts.outfit(
-                      fontWeight: FontWeight.bold,
-                      color: AppColors.accentPink,
+          Flexible(
+            child: Obx(
+              () => Column(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  Container(
+                    padding: EdgeInsets.symmetric(
+                      horizontal: screenWidth < 380 ? 12 : 16,
+                      vertical: screenWidth < 380 ? 7 : 8,
+                    ),
+                    decoration: BoxDecoration(
+                      color: AppColors.white,
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(color: AppColors.border),
+                    ),
+                    child: Text(
+                      'SCORE: ${controller.score.value}',
+                      style: GoogleFonts.outfit(
+                        fontSize: screenWidth < 380 ? 13 : 14,
+                        fontWeight: FontWeight.bold,
+                        color: AppColors.accentPink,
+                      ),
                     ),
                   ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  'PROGRESS: ${controller.matchesFound.value}/${(controller.level.value.gridSize * controller.level.value.gridSize) ~/ 2}',
-                  style: GoogleFonts.outfit(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600,
-                    color: AppColors.textGrey,
+                  const SizedBox(height: 4),
+                  Text(
+                    'PROGRESS: ${controller.matchesFound.value}/${(controller.level.value.gridSize * controller.level.value.gridSize) ~/ 2}',
+                    overflow: TextOverflow.ellipsis,
+                    style: GoogleFonts.outfit(
+                      fontSize: screenWidth < 380 ? 11 : 12,
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.textGrey,
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildCircleAction({
+    required IconData icon,
+    required VoidCallback onTap,
+    Color? iconColor,
+  }) {
+    final screenWidth = MediaQuery.sizeOf(context).width;
+
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: EdgeInsets.all(screenWidth < 380 ? 9 : 11),
+        decoration: BoxDecoration(
+          color: AppColors.white,
+          shape: BoxShape.circle,
+          border: Border.all(color: AppColors.border),
+        ),
+        child: Icon(
+          icon,
+          color: iconColor ?? AppColors.textDark,
+          size: screenWidth < 380 ? 17 : 19,
+        ),
       ),
     );
   }
@@ -202,17 +257,20 @@ class _GameScreenState extends State<GameScreen> {
       children: [
         Obx(() {
           int gridSize = controller.level.value.gridSize;
+          final spacing = gridSize >= 6 ? 6.0 : (gridSize >= 4 ? 12.0 : 16.0);
+          final horizontalPadding = gridSize >= 6 ? 12.0 : 24.0;
+          final childAspectRatio = gridSize >= 6 ? 0.93 : 1.0;
           return Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 24.0),
+            padding: EdgeInsets.symmetric(horizontal: horizontalPadding),
             child: Center(
               child: GridView.builder(
                 shrinkWrap: true,
                 physics: const NeverScrollableScrollPhysics(),
                 gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
                   crossAxisCount: gridSize,
-                  crossAxisSpacing: 20,
-                  mainAxisSpacing: 20,
-                  childAspectRatio: 1,
+                  crossAxisSpacing: spacing,
+                  mainAxisSpacing: spacing,
+                  childAspectRatio: childAspectRatio,
                 ),
                 itemCount: controller.cards.length,
                 itemBuilder: (context, index) {
@@ -253,15 +311,20 @@ class _GameScreenState extends State<GameScreen> {
   }
 
   Widget _buildBottomBar(GameController controller) {
+    final screenWidth = MediaQuery.sizeOf(context).width;
+
     return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 24),
-      padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 32),
+      margin: EdgeInsets.symmetric(horizontal: screenWidth < 380 ? 14 : 24),
+      padding: EdgeInsets.symmetric(
+        vertical: screenWidth < 380 ? 12 : 16,
+        horizontal: screenWidth < 380 ? 24 : 32,
+      ),
       decoration: BoxDecoration(
         color: AppColors.white,
         borderRadius: BorderRadius.circular(40),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.03),
+            color: Colors.black.withValues(alpha: 0.03),
             blurRadius: 10,
             offset: const Offset(0, 4),
           ),
@@ -276,20 +339,41 @@ class _GameScreenState extends State<GameScreen> {
               () => Text(
                 _formatTime(controller.secondsElapsed.value),
                 style: GoogleFonts.outfit(
-                  fontSize: 18,
+                  fontSize: screenWidth < 380 ? 16 : 18,
                   fontWeight: FontWeight.bold,
                 ),
               ),
             ),
           ),
-          Container(height: 30, width: 1, color: Colors.grey.withOpacity(0.2)),
+          Container(
+            height: 30,
+            width: 1,
+            color: Colors.grey.withValues(alpha: 0.2),
+          ),
           _buildStat(
             'MOVES',
             Obx(
               () => Text(
                 '${controller.moves.value}',
                 style: GoogleFonts.outfit(
-                  fontSize: 18,
+                  fontSize: screenWidth < 380 ? 16 : 18,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
+          ),
+          Container(
+            height: 30,
+            width: 1,
+            color: Colors.grey.withValues(alpha: 0.2),
+          ),
+          _buildStat(
+            'BEST',
+            Obx(
+              () => Text(
+                'x${controller.bestCombo.value}',
+                style: GoogleFonts.outfit(
+                  fontSize: screenWidth < 380 ? 16 : 18,
                   fontWeight: FontWeight.bold,
                 ),
               ),

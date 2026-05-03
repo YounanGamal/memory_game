@@ -7,10 +7,7 @@ class CardModel {
   final RxBool isMatched = false.obs;
   final RxBool isWrong = false.obs;
 
-  CardModel({
-    required this.id,
-    required this.value,
-  });
+  CardModel({required this.id, required this.value});
 
   void reset() {
     isFlipped.value = false;

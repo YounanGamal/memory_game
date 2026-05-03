@@ -14,6 +14,7 @@ class GameController extends GetxController {
   final RxInt matchesFound = 0.obs;
   final RxInt score = 0.obs;
   final RxInt combo = 1.obs;
+  final RxInt bestCombo = 1.obs;
 
   DateTime? _lastMatchTime;
   Timer? _timer;
@@ -133,6 +134,7 @@ class GameController extends GetxController {
     matchesFound.value = 0;
     score.value = 0;
     combo.value = 1;
+    bestCombo.value = 1;
     _lastMatchTime = null;
     _firstSelectedCard = null;
     _isProcessing = false;
@@ -247,6 +249,9 @@ class GameController extends GetxController {
       } else {
         combo.value = 1;
       }
+    }
+    if (combo.value > bestCombo.value) {
+      bestCombo.value = combo.value;
     }
     _lastMatchTime = now;
 

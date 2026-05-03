@@ -18,35 +18,41 @@ class LevelCard extends StatelessWidget {
   Widget build(BuildContext context) {
     String label = level.name.toUpperCase();
     String details = '${level.gridSize}x${level.gridSize} Grid';
-    
+
     return GestureDetector(
       onTap: onTap,
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 300),
         padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 16),
         decoration: BoxDecoration(
-          color: isSelected ? AppColors.white : AppColors.white.withOpacity(0.5),
-          borderRadius: BorderRadius.circular(20),
+          color: isSelected
+              ? AppColors.white
+              : AppColors.white.withValues(alpha: 0.72),
+          borderRadius: BorderRadius.circular(18),
           border: Border.all(
-            color: isSelected ? AppColors.primaryPink : Colors.transparent,
+            color: isSelected ? AppColors.primaryPink : AppColors.border,
             width: 2,
           ),
-          boxShadow: isSelected ? [
-            BoxShadow(
-              color: AppColors.primaryPink.withOpacity(0.1),
-              blurRadius: 10,
-              offset: const Offset(0, 4),
-            )
-          ] : [],
+          boxShadow: isSelected
+              ? [
+                  BoxShadow(
+                    color: AppColors.primaryPink.withValues(alpha: 0.12),
+                    blurRadius: 14,
+                    offset: const Offset(0, 6),
+                  ),
+                ]
+              : [],
         ),
         child: Column(
           children: [
-            Text(
-              label,
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-                color: isSelected ? AppColors.accentPink : AppColors.textGrey,
+            FittedBox(
+              child: Text(
+                label,
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  color: isSelected ? AppColors.accentPink : AppColors.textGrey,
+                ),
               ),
             ),
             const SizedBox(height: 4),

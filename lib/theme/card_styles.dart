@@ -3,38 +3,42 @@ import 'app_colors.dart';
 
 class CardStyles {
   static const double borderRadius = 20.0;
-  
-  static BoxDecoration closedDecoration = BoxDecoration(
+
+  static BoxDecoration get closedDecoration => BoxDecoration(
     gradient: AppColors.primaryGradient,
     borderRadius: BorderRadius.circular(borderRadius),
     boxShadow: [
       BoxShadow(
-        color: AppColors.primaryPink.withOpacity(0.2),
+        color: AppColors.primaryPink.withValues(alpha: 0.2),
         blurRadius: 12,
         offset: const Offset(0, 4),
       ),
     ],
   );
 
-  static BoxDecoration openDecoration = BoxDecoration(
+  static BoxDecoration get openDecoration => BoxDecoration(
     color: AppColors.white,
     borderRadius: BorderRadius.circular(borderRadius),
+    border: Border.all(color: AppColors.border),
     boxShadow: [
       BoxShadow(
-        color: Colors.black.withOpacity(0.05),
+        color: Colors.black.withValues(alpha: 0.05),
         blurRadius: 10,
         offset: const Offset(0, 2),
       ),
     ],
   );
 
-  static BoxDecoration matchedDecoration = BoxDecoration(
+  static BoxDecoration get matchedDecoration => BoxDecoration(
     color: AppColors.white,
     borderRadius: BorderRadius.circular(borderRadius),
-    border: Border.all(color: AppColors.primaryPink.withOpacity(0.3), width: 2),
+    border: Border.all(
+      color: AppColors.primaryPink.withValues(alpha: 0.3),
+      width: 2,
+    ),
     boxShadow: [
       BoxShadow(
-        color: AppColors.primaryPink.withOpacity(0.15),
+        color: AppColors.primaryPink.withValues(alpha: 0.15),
         blurRadius: 15,
         spreadRadius: 2,
       ),
