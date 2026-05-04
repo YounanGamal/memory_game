@@ -5,8 +5,12 @@ import 'package:get/get.dart';
 import '../core/enums/game_enums.dart';
 import '../core/services/sound_service.dart';
 import '../models/card_model.dart';
+import '../models/reward_result.dart';
+import 'progression_controller.dart';
 
 class GameController extends GetxController {
+  final ProgressionController progression = Get.find<ProgressionController>();
+
   final Rx<GameState> state = GameState.idle.obs;
   final Rx<GameLevel> level = GameLevel.easy.obs;
   final Rx<GameMode> mode = GameMode.classic.obs;
@@ -24,19 +28,32 @@ class GameController extends GetxController {
   final RxInt hintCooldown = 0.obs;
   final RxInt autoMatchCooldown = 0.obs;
   final RxInt wrongAttempts = 0.obs;
+  final RxInt revealCooldown = 0.obs;
+  final RxInt slowTimeCooldown = 0.obs;
+  final RxInt highlightCooldown = 0.obs;
+  final RxInt slowTimeSeconds = 0.obs;
+  final Rxn<RewardResult> lastReward = Rxn<RewardResult>();
 
   DateTime? _lastMatchTime;
   Timer? _timer;
   Timer? _hintCooldownTimer;
   Timer? _autoMatchCooldownTimer;
+  Timer? _revealCooldownTimer;
+  Timer? _slowTimeCooldownTimer;
+  Timer? _highlightCooldownTimer;
+  Timer? _slowTimeTimer;
   CardModel? _firstSelectedCard;
   bool _isProcessing = false;
   int _previewToken = 0;
+  int _timerTicks = 0;
+  int _wrongAttemptsThisGame = 0;
 
   static const int _comboThresholdSeconds = 5;
   static const int _assistCooldownSeconds = 3;
   static const int _autoMatchPenalty = 50;
   static const int _failSoundAttemptThreshold = 3;
+  static const int _powerUpCooldownSeconds = 8;
+  static const int _slowTimeDurationSeconds = 10;
 
   bool get isTimeAttack => mode.value == GameMode.timeAttack;
   bool get hasAssists => mode.value == GameMode.assist;
@@ -52,6 +69,13 @@ class GameController extends GetxController {
       !_isProcessing &&
       autoMatchesLeft.value > 0 &&
       autoMatchCooldown.value == 0;
+
+  bool canUsePowerUp(PowerUpType type) {
+    return state.value == GameState.playing &&
+        !_isProcessing &&
+        progression.countFor(type) > 0 &&
+        _cooldownFor(type).value == 0;
+  }
 
   final List<String> _emojiPool = [
     // Animals
@@ -106,6 +130,10 @@ class GameController extends GetxController {
     _timer?.cancel();
     _hintCooldownTimer?.cancel();
     _autoMatchCooldownTimer?.cancel();
+    _revealCooldownTimer?.cancel();
+    _slowTimeCooldownTimer?.cancel();
+    _highlightCooldownTimer?.cancel();
+    _slowTimeTimer?.cancel();
 
     level.value = selectedLevel;
     mode.value = selectedMode;
@@ -121,10 +149,17 @@ class GameController extends GetxController {
     autoMatchesLeft.value = selectedMode == GameMode.assist ? 1 : 0;
     hintCooldown.value = 0;
     autoMatchCooldown.value = 0;
+    revealCooldown.value = 0;
+    slowTimeCooldown.value = 0;
+    highlightCooldown.value = 0;
+    slowTimeSeconds.value = 0;
     wrongAttempts.value = 0;
+    lastReward.value = null;
     _lastMatchTime = null;
     _firstSelectedCard = null;
     _isProcessing = false;
+    _timerTicks = 0;
+    _wrongAttemptsThisGame = 0;
 
     // Start Preview
     state.value = GameState.preview;
@@ -246,6 +281,126 @@ class GameController extends GetxController {
     _checkWin();
   }
 
+  Future<void> usePowerUp(PowerUpType type) async {
+    if (!canUsePowerUp(type)) return;
+
+    final wasConsumed = await progression.consumePowerUp(type);
+    if (!wasConsumed) return;
+
+    switch (type) {
+      case PowerUpType.reveal:
+        await _useRevealPowerUp();
+      case PowerUpType.autoMatch:
+        await _useAutoMatchPowerUp();
+      case PowerUpType.slowTime:
+        _useSlowTimePowerUp();
+      case PowerUpType.highlight:
+        await _useHighlightPowerUp();
+    }
+  }
+
+  Future<void> _useRevealPowerUp() async {
+    _startCooldown(
+      revealCooldown,
+      (timer) => _revealCooldownTimer = timer,
+      seconds: _powerUpCooldownSeconds,
+    );
+    _firstSelectedCard = null;
+    _isProcessing = true;
+    state.value = GameState.preview;
+    SoundService.playFlip();
+
+    for (final card in cards) {
+      if (!card.isMatched.value) {
+        card.isFlipped.value = true;
+      }
+    }
+
+    await Future.delayed(const Duration(seconds: 2));
+
+    for (final card in cards) {
+      if (!card.isMatched.value) {
+        card.isFlipped.value = false;
+      }
+    }
+
+    _isProcessing = false;
+    state.value = GameState.playing;
+  }
+
+  Future<void> _useAutoMatchPowerUp() async {
+    final pair = _findUnmatchedPair();
+    if (pair == null) return;
+
+    _startCooldown(
+      autoMatchCooldown,
+      (timer) => _autoMatchCooldownTimer = timer,
+      seconds: _powerUpCooldownSeconds,
+    );
+    _firstSelectedCard = null;
+    _isProcessing = true;
+    moves.value++;
+
+    final first = pair.$1;
+    final second = pair.$2;
+    first.isHighlighted.value = false;
+    second.isHighlighted.value = false;
+    first.isFlipped.value = true;
+    second.isFlipped.value = true;
+    SoundService.playFlip();
+
+    await Future.delayed(const Duration(milliseconds: 350));
+
+    first.isMatched.value = true;
+    second.isMatched.value = true;
+    matchesFound.value++;
+    _handleMatch();
+    score.value = math.max(0, score.value - _autoMatchPenalty);
+    SoundService.playMatch();
+
+    _isProcessing = false;
+    _checkWin();
+  }
+
+  void _useSlowTimePowerUp() {
+    _startCooldown(
+      slowTimeCooldown,
+      (timer) => _slowTimeCooldownTimer = timer,
+      seconds: _powerUpCooldownSeconds,
+    );
+    slowTimeSeconds.value = _slowTimeDurationSeconds;
+    _slowTimeTimer?.cancel();
+    _slowTimeTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      if (slowTimeSeconds.value <= 1 ||
+          state.value == GameState.finished ||
+          state.value == GameState.lost) {
+        slowTimeSeconds.value = 0;
+        timer.cancel();
+      } else if (state.value == GameState.playing) {
+        slowTimeSeconds.value--;
+      }
+    });
+  }
+
+  Future<void> _useHighlightPowerUp() async {
+    final pair = _findUnmatchedPair();
+    if (pair == null) return;
+
+    _startCooldown(
+      highlightCooldown,
+      (timer) => _highlightCooldownTimer = timer,
+      seconds: _powerUpCooldownSeconds,
+    );
+    pair.$1.isHighlighted.value = true;
+    pair.$2.isHighlighted.value = true;
+    SoundService.playFlip();
+
+    await Future.delayed(const Duration(seconds: 2));
+
+    pair.$1.isHighlighted.value = false;
+    pair.$2.isHighlighted.value = false;
+  }
+
   void _compareCards(CardModel secondCard) async {
     _isProcessing = true;
     moves.value++;
@@ -271,6 +426,7 @@ class GameController extends GetxController {
       combo.value = 1; // Reset combo on mismatch
 
       wrongAttempts.value++;
+      _wrongAttemptsThisGame++;
       if (wrongAttempts.value >= _failSoundAttemptThreshold) {
         wrongAttempts.value = 0;
         SoundService.playFail();
@@ -296,6 +452,11 @@ class GameController extends GetxController {
     _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
       if (state.value == GameState.playing) {
         if (isTimeAttack) {
+          _timerTicks++;
+          if (slowTimeSeconds.value > 0 && _timerTicks.isOdd) {
+            return;
+          }
+
           remainingSeconds.value--;
           if (remainingSeconds.value <= 0) {
             remainingSeconds.value = 0;
@@ -311,8 +472,12 @@ class GameController extends GetxController {
     });
   }
 
-  void _startCooldown(RxInt target, void Function(Timer timer) storeTimer) {
-    target.value = _assistCooldownSeconds;
+  void _startCooldown(
+    RxInt target,
+    void Function(Timer timer) storeTimer, {
+    int seconds = _assistCooldownSeconds,
+  }) {
+    target.value = seconds;
     late Timer timer;
     timer = Timer.periodic(const Duration(seconds: 1), (_) {
       if (target.value <= 1) {
@@ -335,6 +500,15 @@ class GameController extends GetxController {
       }
     }
     return null;
+  }
+
+  RxInt _cooldownFor(PowerUpType type) {
+    return switch (type) {
+      PowerUpType.reveal => revealCooldown,
+      PowerUpType.autoMatch => autoMatchCooldown,
+      PowerUpType.slowTime => slowTimeCooldown,
+      PowerUpType.highlight => highlightCooldown,
+    };
   }
 
   void _checkWin() {
@@ -365,13 +539,23 @@ class GameController extends GetxController {
     score.value += pointsGained;
   }
 
-  void _winGame() {
+  void _winGame() async {
+    _isProcessing = true;
     // Add bonus for finishing fast
     final elapsed = isTimeAttack
         ? level.value.timeLimit - remainingSeconds.value
         : secondsElapsed.value;
     int timeBonus = (300 - elapsed).clamp(0, 1000);
     score.value += timeBonus;
+
+    lastReward.value = await progression.recordWin(
+      level: level.value,
+      mode: mode.value,
+      score: score.value,
+      moves: moves.value,
+      elapsedSeconds: elapsed,
+      wrongAttempts: _wrongAttemptsThisGame,
+    );
 
     SoundService.playWin();
 
@@ -381,6 +565,7 @@ class GameController extends GetxController {
 
   void _loseGame() {
     state.value = GameState.lost;
+    progression.recordLoss();
     _timer?.cancel();
     _isProcessing = false;
   }
@@ -390,6 +575,10 @@ class GameController extends GetxController {
     _timer?.cancel();
     _hintCooldownTimer?.cancel();
     _autoMatchCooldownTimer?.cancel();
+    _revealCooldownTimer?.cancel();
+    _slowTimeCooldownTimer?.cancel();
+    _highlightCooldownTimer?.cancel();
+    _slowTimeTimer?.cancel();
     SoundService.dispose();
     super.onClose();
   }

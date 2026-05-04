@@ -1,12 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'controllers/progression_controller.dart';
 import 'controllers/theme_controller.dart';
 import 'screens/splash_screen.dart';
 import 'theme/app_colors.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  final progressionController = Get.put(ProgressionController());
   final themeController = Get.put(ThemeController());
+  await progressionController.load();
   await themeController.loadTheme();
 
   runApp(const MemoryGameApp());

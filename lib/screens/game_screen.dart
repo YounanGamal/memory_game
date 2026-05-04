@@ -5,9 +5,11 @@ import 'package:google_fonts/google_fonts.dart';
 import '../controllers/game_controller.dart';
 import '../controllers/theme_controller.dart';
 import '../core/enums/game_enums.dart';
+import '../models/reward_result.dart';
 import '../theme/app_colors.dart';
 import '../widgets/memory_card_widget.dart';
 import '../widgets/result_video_widget.dart';
+import 'power_ups_screen.dart';
 
 class GameScreen extends StatefulWidget {
   const GameScreen({super.key});
@@ -39,7 +41,7 @@ class _GameScreenState extends State<GameScreen> {
       Dialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
         child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 20,vertical: 16),
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
           decoration: BoxDecoration(
             color: AppColors.white,
             borderRadius: BorderRadius.circular(30),
@@ -66,6 +68,10 @@ class _GameScreenState extends State<GameScreen> {
                 style: GoogleFonts.outfit(color: AppColors.textGrey),
               ),
               const SizedBox(height: 24),
+              if (didWin && controller.lastReward.value != null) ...[
+                _buildRewardSummary(controller.lastReward.value!),
+                const SizedBox(height: 16),
+              ],
               _buildResultRow(
                 controller.isTimeAttack ? 'Time Left' : 'Time',
                 _formatTime(
@@ -137,20 +143,55 @@ class _GameScreenState extends State<GameScreen> {
     );
   }
 
+  Widget _buildRewardSummary(RewardResult reward) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      decoration: BoxDecoration(
+        color: AppColors.accentPink.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppColors.accentPink.withValues(alpha: 0.14)),
+      ),
+      child: Row(
+        children: [
+          Icon(Icons.monetization_on_rounded, color: AppColors.accentPink),
+          const SizedBox(width: 6),
+          Text(
+            '+${reward.coins}',
+            style: GoogleFonts.outfit(
+              color: AppColors.textDark,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          const Spacer(),
+          ...List.generate(
+            3,
+            (index) => Icon(
+              index < reward.stars
+                  ? Icons.star_rounded
+                  : Icons.star_border_rounded,
+              color: Colors.amber,
+              size: 24,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Obx(
       () => Scaffold(
         backgroundColor: AppColors.background,
+
         body: SafeArea(
           child: Column(
             children: [
               _buildTopBar(controller),
               Expanded(child: _buildGrid(controller)),
-              if (controller.hasAssists) ...[
-                _buildAssistsRow(controller),
-                const SizedBox(height: 16),
-              ],
+              _buildPowerUpsRow(controller),
+              const SizedBox(height: 16),
               _buildBottomBar(controller),
               const SizedBox(height: 20),
             ],
@@ -197,6 +238,12 @@ class _GameScreenState extends State<GameScreen> {
                   onTap: themeController.toggleTheme,
                   iconColor: AppColors.accentPink,
                 ),
+              ),
+              const SizedBox(width: 10),
+              _buildCircleAction(
+                icon: Icons.shopping_basket_rounded,
+                onTap: () => Get.to(() => const PowerUpsScreen()),
+                iconColor: AppColors.accentPink,
               ),
             ],
           ),
@@ -268,65 +315,55 @@ class _GameScreenState extends State<GameScreen> {
     );
   }
 
-  Widget _buildAssistsRow(GameController controller) {
+  Widget _buildPowerUpsRow(GameController controller) {
     return Obx(() {
-      return Row(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          _buildPremiumAssistButton(
-            icon: Icons.visibility_rounded,
-            title: 'Hint',
-            count: controller.hintsLeft.value,
-            cooldown: controller.hintCooldown.value,
-            isEnabled: controller.canUseHint,
-            onTap: controller.useHint,
-            gradient: const LinearGradient(colors: [Colors.blue, Colors.lightBlueAccent]),
-          ),
-          const SizedBox(width: 24),
-          _buildPremiumAssistButton(
-            icon: Icons.auto_awesome_rounded,
-            title: 'Auto Match',
-            count: controller.autoMatchesLeft.value,
-            cooldown: controller.autoMatchCooldown.value,
-            isEnabled: controller.canUseAutoMatch,
-            onTap: controller.useAutoMatch,
-            gradient: const LinearGradient(colors: [Colors.purple, Colors.purpleAccent]),
-          ),
-        ],
+      return Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 18),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+          children: PowerUpType.values.map((type) {
+            return _buildPowerUpButton(
+              type: type,
+              count: controller.progression.countFor(type),
+              cooldown: _powerUpCooldown(controller, type),
+              isEnabled: controller.canUsePowerUp(type),
+              onTap: () => controller.usePowerUp(type),
+            );
+          }).toList(),
+        ),
       );
     });
   }
 
-  Widget _buildPremiumAssistButton({
-    required IconData icon,
-    required String title,
+  Widget _buildPowerUpButton({
+    required PowerUpType type,
     required int count,
     required int cooldown,
     required bool isEnabled,
     required VoidCallback onTap,
-    required Gradient gradient,
   }) {
     final bool isEmpty = count <= 0;
-    
+
     return GestureDetector(
       onTap: isEnabled ? onTap : null,
       child: AnimatedOpacity(
         duration: const Duration(milliseconds: 200),
-        opacity: isEmpty ? 0.4 : 1.0,
+        opacity: isEnabled ? 1.0 : 0.42,
         child: Column(
+          mainAxisSize: MainAxisSize.min,
           children: [
             Stack(
               clipBehavior: Clip.none,
               children: [
                 Container(
-                  width: 56,
-                  height: 56,
+                  width: 50,
+                  height: 50,
                   decoration: BoxDecoration(
-                    gradient: gradient,
+                    gradient: AppColors.primaryGradient,
                     shape: BoxShape.circle,
                     boxShadow: [
                       BoxShadow(
-                        color: gradient.colors.last.withValues(alpha: 0.3),
+                        color: AppColors.primaryPurple.withValues(alpha: 0.22),
                         blurRadius: 10,
                         offset: const Offset(0, 4),
                       ),
@@ -337,12 +374,16 @@ class _GameScreenState extends State<GameScreen> {
                         ? Text(
                             '$cooldown',
                             style: GoogleFonts.outfit(
-                              fontSize: 22,
+                              fontSize: 18,
                               fontWeight: FontWeight.bold,
                               color: Colors.white,
                             ),
                           )
-                        : Icon(icon, color: Colors.white, size: 28),
+                        : Icon(
+                            _powerUpIcon(type),
+                            color: Colors.white,
+                            size: 24,
+                          ),
                   ),
                 ),
                 if (!isEmpty)
@@ -369,18 +410,33 @@ class _GameScreenState extends State<GameScreen> {
               ],
             ),
             const SizedBox(height: 8),
-            Text(
-              title,
-              style: GoogleFonts.outfit(
-                fontSize: 12,
-                fontWeight: FontWeight.w600,
-                color: AppColors.textGrey,
+            SizedBox(
+              width: 72,
+              child: Text(
+                type.label,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                textAlign: TextAlign.center,
+                style: GoogleFonts.outfit(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.textGrey,
+                ),
               ),
             ),
           ],
         ),
       ),
     );
+  }
+
+  int _powerUpCooldown(GameController controller, PowerUpType type) {
+    return switch (type) {
+      PowerUpType.reveal => controller.revealCooldown.value,
+      PowerUpType.autoMatch => controller.autoMatchCooldown.value,
+      PowerUpType.slowTime => controller.slowTimeCooldown.value,
+      PowerUpType.highlight => controller.highlightCooldown.value,
+    };
   }
 
   Widget _buildGrid(GameController controller) {
@@ -558,4 +614,13 @@ class _GameScreenState extends State<GameScreen> {
     int secs = seconds % 60;
     return '${mins.toString().padLeft(2, '0')}:${secs.toString().padLeft(2, '0')}';
   }
+}
+
+IconData _powerUpIcon(PowerUpType type) {
+  return switch (type) {
+    PowerUpType.reveal => Icons.visibility_rounded,
+    PowerUpType.autoMatch => Icons.auto_awesome_rounded,
+    PowerUpType.slowTime => Icons.slow_motion_video_rounded,
+    PowerUpType.highlight => Icons.center_focus_strong_rounded,
+  };
 }

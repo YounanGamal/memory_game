@@ -3,11 +3,13 @@ import 'package:flutter_animate/flutter_animate.dart';
 import 'package:get/get.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../controllers/game_controller.dart';
+import '../controllers/progression_controller.dart';
 import '../controllers/theme_controller.dart';
 import '../core/enums/game_enums.dart';
 import '../theme/app_colors.dart';
 import '../widgets/level_card.dart';
 import 'game_screen.dart';
+import 'power_ups_screen.dart';
 
 class StartScreen extends StatefulWidget {
   const StartScreen({super.key});
@@ -18,6 +20,7 @@ class StartScreen extends StatefulWidget {
 
 class _StartScreenState extends State<StartScreen> {
   final GameController controller = Get.put(GameController());
+  final ProgressionController progression = Get.find<ProgressionController>();
   final ThemeController themeController = Get.find<ThemeController>();
   GameLevel _selectedLevel = GameLevel.easy;
   GameMode _selectedMode = GameMode.classic;
@@ -27,26 +30,31 @@ class _StartScreenState extends State<StartScreen> {
     return Obx(
       () => Scaffold(
         backgroundColor: AppColors.background,
+        appBar: AppBar(
+          actions: [
+            IconButton.filledTonal(
+              onPressed: () => Get.to(() => const PowerUpsScreen()),
+              icon: const Icon(Icons.shopping_basket_rounded),
+              color: AppColors.accentPink,
+            ),
+            const SizedBox(width: 8),
+            IconButton.filledTonal(
+              onPressed: themeController.toggleTheme,
+              icon: Icon(
+                themeController.isDarkMode.value
+                    ? Icons.light_mode_rounded
+                    : Icons.dark_mode_rounded,
+              ),
+              color: AppColors.accentPink,
+            ),
+          ],
+        ),
         body: SafeArea(
           child: SingleChildScrollView(
             padding: const EdgeInsets.symmetric(horizontal: 24.0),
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Align(
-                  alignment: Alignment.centerRight,
-                  child: IconButton.filledTonal(
-                    onPressed: themeController.toggleTheme,
-                    icon: Icon(
-                      themeController.isDarkMode.value
-                          ? Icons.light_mode_rounded
-                          : Icons.dark_mode_rounded,
-                    ),
-                    color: AppColors.accentPink,
-                  ),
-                ),
-                const SizedBox(height: 28),
-                // Title
                 Text(
                   'Memory',
                   style: GoogleFonts.outfit(
@@ -75,7 +83,13 @@ class _StartScreenState extends State<StartScreen> {
                   ),
                 ).animate().fadeIn(delay: 500.ms),
 
-                const SizedBox(height: 44),
+                const SizedBox(height: 30),
+
+                _ProgressSummary(
+                  progression: progression,
+                ).animate().fadeIn(delay: 560.ms).slideY(begin: 0.08, end: 0),
+
+                const SizedBox(height: 25),
 
                 // Level Selection
                 Text(
@@ -86,7 +100,7 @@ class _StartScreenState extends State<StartScreen> {
                     color: AppColors.textDark,
                   ),
                 ),
-                const SizedBox(height: 24),
+                const SizedBox(height: 20),
                 Row(
                   children: [
                     Expanded(
@@ -118,7 +132,7 @@ class _StartScreenState extends State<StartScreen> {
                   ],
                 ).animate().fadeIn(delay: 600.ms).slideX(begin: 0.1, end: 0),
 
-                const SizedBox(height: 28),
+                const SizedBox(height: 25),
 
                 Text(
                   'Select Mode',
@@ -182,7 +196,7 @@ class _StartScreenState extends State<StartScreen> {
                     .fadeIn(delay: 800.ms)
                     .scale(begin: const Offset(0.9, 0.9)),
 
-                const SizedBox(height: 40),
+                const SizedBox(height: 30),
               ],
             ),
           ),
@@ -263,5 +277,91 @@ class _ModeTile extends StatelessWidget {
         ),
       ),
     );
+  }
+}
+
+class _ProgressSummary extends StatelessWidget {
+  final ProgressionController progression;
+
+  const _ProgressSummary({required this.progression});
+
+  @override
+  Widget build(BuildContext context) {
+    return Obx(
+      () => Container(
+        width: double.infinity,
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        decoration: BoxDecoration(
+          color: AppColors.white,
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(color: AppColors.border),
+        ),
+        child: Row(
+          children: [
+            _SummaryItem(
+              icon: Icons.monetization_on_rounded,
+              label: 'Coins',
+              value: '${progression.coins.value}',
+            ),
+            _SummaryDivider(),
+            _SummaryItem(
+              icon: Icons.star_rounded,
+              label: 'Stars',
+              value: '${progression.totalStars.value}',
+            ),
+            _SummaryDivider(),
+            _SummaryItem(
+              icon: Icons.emoji_events_rounded,
+              label: 'Wins',
+              value: '${progression.wins.value}',
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _SummaryItem extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final String value;
+
+  const _SummaryItem({
+    required this.icon,
+    required this.label,
+    required this.value,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Expanded(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, color: AppColors.accentPink, size: 22),
+          const SizedBox(height: 4),
+          Text(
+            value,
+            style: GoogleFonts.outfit(
+              color: AppColors.textDark,
+              fontWeight: FontWeight.bold,
+              fontSize: 16,
+            ),
+          ),
+          Text(
+            label,
+            style: GoogleFonts.outfit(color: AppColors.textGrey, fontSize: 11),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _SummaryDivider extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return Container(width: 1, height: 38, color: AppColors.border);
   }
 }

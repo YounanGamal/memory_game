@@ -19,6 +19,7 @@ class MemoryCardWidget extends StatelessWidget {
       final bool isFlipped = card.isFlipped.value;
       final bool isMatched = card.isMatched.value;
       final bool isWrong = card.isWrong.value;
+      final bool isHighlighted = card.isHighlighted.value;
 
       return GestureDetector(
         onTap: () {
@@ -33,7 +34,7 @@ class MemoryCardWidget extends StatelessWidget {
             final isBack = angle >= 90;
             Widget cardContent = isBack
                 ? _buildFront(isMatched, isWrong)
-                : _buildBack();
+                : _buildBack(isHighlighted);
 
             if (isWrong) {
               cardContent = cardContent.animate().shake(
@@ -110,16 +111,30 @@ class MemoryCardWidget extends StatelessWidget {
     return content;
   }
 
-  Widget _buildBack() {
+  Widget _buildBack(bool isHighlighted) {
     return LayoutBuilder(
       builder: (context, constraints) {
         final iconSize = (constraints.maxWidth * 0.42).clamp(16.0, 30.0);
         final glossSize = (constraints.maxWidth * 1.45).clamp(44.0, 80.0);
 
-        return Container(
+        final baseDecoration = CardStyles.closedDecoration;
+
+        return AnimatedContainer(
+          duration: const Duration(milliseconds: 180),
           key: const ValueKey('back'),
           clipBehavior: Clip.antiAlias,
-          decoration: CardStyles.closedDecoration,
+          decoration: isHighlighted
+              ? baseDecoration.copyWith(
+                  border: Border.all(color: Colors.amberAccent, width: 3),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.amberAccent.withValues(alpha: 0.45),
+                      blurRadius: 18,
+                      spreadRadius: 1,
+                    ),
+                  ],
+                )
+              : baseDecoration,
           child: Stack(
             children: [
               // Subtle highlight/glossy effect

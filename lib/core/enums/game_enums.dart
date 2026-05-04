@@ -26,3 +26,15 @@ enum GameLevel {
     required this.timeLimit,
   });
 }
+
+enum PowerUpType {
+  reveal(label: 'Reveal', cost: 30),
+  autoMatch(label: 'Auto Match', cost: 45),
+  slowTime(label: 'Slow Time', cost: 40),
+  highlight(label: 'Highlight', cost: 25);
+
+  final String label;
+  final int cost;
+
+  const PowerUpType({required this.label, required this.cost});
+}
