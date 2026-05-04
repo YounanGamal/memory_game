@@ -14,8 +14,14 @@ class ProgressionController extends GetxController {
   static const String _bestScoreKey = 'progression_best_score';
   static const String _bestTimeKey = 'progression_best_time';
   static const String _perfectWinsKey = 'progression_perfect_wins';
+  static const String _heartsKey = 'progression_hearts';
+  static const String _unlockedLevelKey = 'progression_unlocked_level';
+  static const int maxHearts = 5;
+  static const int heartCost = 50;
 
   final RxInt coins = 0.obs;
+  final RxInt hearts = maxHearts.obs;
+  final RxMap<String, int> highestUnlockedLevelByMode = <String, int>{}.obs;
   final RxInt totalStars = 0.obs;
   final RxInt wins = 0.obs;
   final RxInt gamesPlayed = 0.obs;
@@ -27,7 +33,18 @@ class ProgressionController extends GetxController {
 
   Future<void> load() async {
     final preferences = await SharedPreferences.getInstance();
-    coins.value = preferences.getInt(_coinsKey) ?? 60;
+    coins.value = preferences.getInt(_coinsKey) ?? 250;
+    hearts.value = preferences.getInt(_heartsKey) ?? maxHearts;
+    highestUnlockedLevelByMode.value = {
+      for (final mode in GameMode.values)
+        mode.name:
+            (preferences.getInt(_unlockedLevelKeyFor(mode)) ??
+                    (mode == GameMode.classic
+                        ? preferences.getInt(_unlockedLevelKey)
+                        : null) ??
+                    1)
+                .clamp(1, mode.levels.length),
+    };
     totalStars.value = preferences.getInt(_starsKey) ?? 0;
     wins.value = preferences.getInt(_winsKey) ?? 0;
     gamesPlayed.value = preferences.getInt(_gamesKey) ?? 0;
@@ -49,6 +66,19 @@ class ProgressionController extends GetxController {
   int countFor(PowerUpType type) => powerUps[type.name] ?? 0;
 
   bool canBuy(PowerUpType type) => coins.value >= type.cost;
+  bool get canBuyHeart => coins.value >= heartCost && hearts.value < maxHearts;
+
+  int highestUnlockedFor(GameMode mode) {
+    return highestUnlockedLevelByMode[mode.name] ?? 1;
+  }
+
+  bool isLevelUnlocked(GameLevel level) =>
+      level.number <= highestUnlockedFor(level.mode);
+
+  bool isCurrentLevel(GameLevel level) =>
+      level.number == highestUnlockedFor(level.mode);
+
+  int starsFor(GameLevel level) => bestStarsByLevel[level.name] ?? 0;
 
   Future<bool> buyPowerUp(PowerUpType type) async {
     if (!canBuy(type)) return false;
@@ -57,6 +87,29 @@ class ProgressionController extends GetxController {
     powerUps[type.name] = countFor(type) + 1;
     await _saveWalletAndPowerUp(type);
     return true;
+  }
+
+  Future<bool> buyHeart() async {
+    if (!canBuyHeart) return false;
+
+    coins.value -= heartCost;
+    hearts.value++;
+    await _saveWalletAndHearts();
+    return true;
+  }
+
+  Future<bool> loseHeart() async {
+    if (hearts.value <= 0) return true;
+
+    hearts.value--;
+    await _saveHearts();
+    return hearts.value <= 0;
+  }
+
+  Future<void> restartRun(GameMode mode) async {
+    hearts.value = maxHearts;
+    highestUnlockedLevelByMode[mode.name] = 1;
+    await _saveRunState(mode);
   }
 
   Future<bool> consumePowerUp(PowerUpType type) async {
@@ -101,10 +154,14 @@ class ProgressionController extends GetxController {
     gamesPlayed.value++;
     if (wrongAttempts == 0) perfectWins.value++;
     if (stars > oldBestStars) bestStarsByLevel[level.name] = stars;
+    if (level.number == highestUnlockedFor(mode) &&
+        level.number < mode.levels.length) {
+      highestUnlockedLevelByMode[mode.name] = level.number + 1;
+    }
     if (isBestScore) bestScore.value = score;
     if (isBestTime) bestTimeSeconds.value = elapsedSeconds;
 
-    await _saveProgress(level);
+    await _saveProgress(level, mode);
 
     return RewardResult(
       coins: earnedCoins,
@@ -125,7 +182,7 @@ class ProgressionController extends GetxController {
     required int moves,
     required int elapsedSeconds,
   }) {
-    final pairs = (level.gridSize * level.gridSize) ~/ 2;
+    final pairs = level.pairsCount;
     final excellentMoves = pairs + 2;
     final goodMoves = (pairs * 2.2).ceil();
     final excellentTime = (level.timeLimit * 0.45).ceil();
@@ -143,14 +200,14 @@ class ProgressionController extends GetxController {
     required int elapsedSeconds,
     required int wrongAttempts,
   }) {
-    final pairs = (level.gridSize * level.gridSize) ~/ 2;
+    final pairs = level.pairsCount;
     final moveBonus = math.max(0, (pairs * 3) - moves) * 2;
     final timeBonus = math.max(0, level.timeLimit - elapsedSeconds) ~/ 4;
     final mistakePenalty = wrongAttempts * 3;
     return math.max(10, (stars * 20) + moveBonus + timeBonus - mistakePenalty);
   }
 
-  Future<void> _saveProgress(GameLevel level) async {
+  Future<void> _saveProgress(GameLevel level, GameMode mode) async {
     final preferences = await SharedPreferences.getInstance();
     await preferences.setInt(_coinsKey, coins.value);
     await preferences.setInt(_starsKey, totalStars.value);
@@ -159,6 +216,11 @@ class ProgressionController extends GetxController {
     await preferences.setInt(_bestScoreKey, bestScore.value);
     await preferences.setInt(_bestTimeKey, bestTimeSeconds.value);
     await preferences.setInt(_perfectWinsKey, perfectWins.value);
+    await preferences.setInt(_heartsKey, hearts.value);
+    await preferences.setInt(
+      _unlockedLevelKeyFor(mode),
+      highestUnlockedFor(mode),
+    );
     await preferences.setInt(
       _levelStarsKey(level),
       bestStarsByLevel[level.name] ?? 0,
@@ -171,6 +233,26 @@ class ProgressionController extends GetxController {
     await preferences.setInt(_powerUpKey(type), countFor(type));
   }
 
+  Future<void> _saveWalletAndHearts() async {
+    final preferences = await SharedPreferences.getInstance();
+    await preferences.setInt(_coinsKey, coins.value);
+    await preferences.setInt(_heartsKey, hearts.value);
+  }
+
+  Future<void> _saveHearts() async {
+    final preferences = await SharedPreferences.getInstance();
+    await preferences.setInt(_heartsKey, hearts.value);
+  }
+
+  Future<void> _saveRunState(GameMode mode) async {
+    final preferences = await SharedPreferences.getInstance();
+    await preferences.setInt(_heartsKey, hearts.value);
+    await preferences.setInt(
+      _unlockedLevelKeyFor(mode),
+      highestUnlockedFor(mode),
+    );
+  }
+
   Future<void> _savePowerUp(PowerUpType type) async {
     final preferences = await SharedPreferences.getInstance();
     await preferences.setInt(_powerUpKey(type), countFor(type));
@@ -178,4 +260,6 @@ class ProgressionController extends GetxController {
 
   static String _powerUpKey(PowerUpType type) => 'power_up_${type.name}';
   static String _levelStarsKey(GameLevel level) => 'best_stars_${level.name}';
+  static String _unlockedLevelKeyFor(GameMode mode) =>
+      '${_unlockedLevelKey}_${mode.name}';
 }

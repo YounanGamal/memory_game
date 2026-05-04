@@ -26,6 +26,7 @@ class _ResultVideoWidgetState extends State<ResultVideoWidget> {
   static const List<String> _successVideos = [
     'assets/video/success1.mp4',
     'assets/video/success2.mp4',
+    'assets/video/success3.mp4',
   ];
   static const String _failVideo = 'assets/video/fail1.mp4';
   static final Random _random = Random();
@@ -156,11 +157,6 @@ class _ResultVideoWidgetState extends State<ResultVideoWidget> {
     if (mounted) setState(() {});
   }
 
-  Future<void> _replay() async {
-    widget.onPlayAgain?.call();
-    await _loadResultVideo(keepSameAsset: true);
-  }
-
   Future<void> _disposeController() async {
     final controller = _controller;
     _controller = null;
@@ -184,15 +180,7 @@ class _ResultVideoWidgetState extends State<ResultVideoWidget> {
   Widget build(BuildContext context) {
     return Column(
       mainAxisSize: MainAxisSize.min,
-      children: [
-        _buildVideoFrame(),
-        const SizedBox(height: 12),
-        TextButton.icon(
-          onPressed: _isInitializing ? null : _replay,
-          icon: const Icon(Icons.replay_rounded),
-          label: const Text('Play Again'),
-        ),
-      ],
+      children: [_buildVideoFrame()],
     );
   }
 

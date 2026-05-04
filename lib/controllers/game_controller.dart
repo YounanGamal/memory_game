@@ -12,7 +12,7 @@ class GameController extends GetxController {
   final ProgressionController progression = Get.find<ProgressionController>();
 
   final Rx<GameState> state = GameState.idle.obs;
-  final Rx<GameLevel> level = GameLevel.easy.obs;
+  final Rx<GameLevel> level = GameLevel.classic1.obs;
   final Rx<GameMode> mode = GameMode.classic.obs;
 
   final RxList<CardModel> cards = <CardModel>[].obs;
@@ -23,9 +23,6 @@ class GameController extends GetxController {
   final RxInt score = 0.obs;
   final RxInt combo = 1.obs;
   final RxInt bestCombo = 1.obs;
-  final RxInt hintsLeft = 0.obs;
-  final RxInt autoMatchesLeft = 0.obs;
-  final RxInt hintCooldown = 0.obs;
   final RxInt autoMatchCooldown = 0.obs;
   final RxInt wrongAttempts = 0.obs;
   final RxInt revealCooldown = 0.obs;
@@ -36,7 +33,6 @@ class GameController extends GetxController {
 
   DateTime? _lastMatchTime;
   Timer? _timer;
-  Timer? _hintCooldownTimer;
   Timer? _autoMatchCooldownTimer;
   Timer? _revealCooldownTimer;
   Timer? _slowTimeCooldownTimer;
@@ -49,28 +45,16 @@ class GameController extends GetxController {
   int _wrongAttemptsThisGame = 0;
 
   static const int _comboThresholdSeconds = 5;
-  static const int _assistCooldownSeconds = 3;
   static const int _autoMatchPenalty = 50;
   static const int _failSoundAttemptThreshold = 3;
   static const int _powerUpCooldownSeconds = 8;
   static const int _slowTimeDurationSeconds = 10;
 
   bool get isTimeAttack => mode.value == GameMode.timeAttack;
-  bool get hasAssists => mode.value == GameMode.assist;
-  bool get canUseHint =>
-      hasAssists &&
-      state.value == GameState.playing &&
-      !_isProcessing &&
-      hintsLeft.value > 0 &&
-      hintCooldown.value == 0;
-  bool get canUseAutoMatch =>
-      hasAssists &&
-      state.value == GameState.playing &&
-      !_isProcessing &&
-      autoMatchesLeft.value > 0 &&
-      autoMatchCooldown.value == 0;
 
   bool canUsePowerUp(PowerUpType type) {
+    if (type == PowerUpType.slowTime && !isTimeAttack) return false;
+
     return state.value == GameState.playing &&
         !_isProcessing &&
         progression.countFor(type) > 0 &&
@@ -128,7 +112,6 @@ class GameController extends GetxController {
   ]) async {
     final token = ++_previewToken;
     _timer?.cancel();
-    _hintCooldownTimer?.cancel();
     _autoMatchCooldownTimer?.cancel();
     _revealCooldownTimer?.cancel();
     _slowTimeCooldownTimer?.cancel();
@@ -145,9 +128,6 @@ class GameController extends GetxController {
     score.value = 0;
     combo.value = 1;
     bestCombo.value = 1;
-    hintsLeft.value = selectedMode == GameMode.assist ? 1 : 0;
-    autoMatchesLeft.value = selectedMode == GameMode.assist ? 1 : 0;
-    hintCooldown.value = 0;
     autoMatchCooldown.value = 0;
     revealCooldown.value = 0;
     slowTimeCooldown.value = 0;
@@ -179,8 +159,8 @@ class GameController extends GetxController {
   }
 
   void _generateBoard() {
-    int totalCards = level.value.gridSize * level.value.gridSize;
-    int pairsNeeded = totalCards ~/ 2;
+    int totalCards = level.value.totalCards;
+    int pairsNeeded = level.value.pairsCount;
 
     List<String> selectedEmojis = (_emojiPool..shuffle())
         .take(pairsNeeded)
@@ -208,77 +188,6 @@ class GameController extends GetxController {
     } else {
       _compareCards(card);
     }
-  }
-
-  Future<void> useHint() async {
-    if (!canUseHint || state.value != GameState.playing || _isProcessing) {
-      return;
-    }
-
-    hintsLeft.value--;
-    _startCooldown(hintCooldown, (timer) => _hintCooldownTimer = timer);
-    _firstSelectedCard = null;
-    _isProcessing = true;
-    state.value = GameState.preview;
-    SoundService.playFlip();
-
-    for (final card in cards) {
-      if (!card.isMatched.value) {
-        card.isFlipped.value = true;
-      }
-    }
-
-    // Wait for the duration of the cooldown so the timer acts as a visual countdown
-    await Future.delayed(Duration(seconds: _assistCooldownSeconds));
-
-    for (final card in cards) {
-      if (!card.isMatched.value) {
-        card.isFlipped.value = false;
-      }
-    }
-
-    _isProcessing = false;
-    state.value = GameState.playing;
-  }
-
-  Future<void> useAutoMatch() async {
-    if (!canUseAutoMatch || state.value != GameState.playing || _isProcessing) {
-      return;
-    }
-
-    final pair = _findUnmatchedPair();
-    if (pair == null) {
-      return;
-    }
-
-    autoMatchesLeft.value--;
-    if (autoMatchesLeft.value > 0) {
-      _startCooldown(
-        autoMatchCooldown,
-        (timer) => _autoMatchCooldownTimer = timer,
-      );
-    }
-    _firstSelectedCard = null;
-    _isProcessing = true;
-    moves.value++;
-
-    final first = pair.$1;
-    final second = pair.$2;
-    first.isFlipped.value = true;
-    second.isFlipped.value = true;
-    SoundService.playFlip();
-
-    await Future.delayed(const Duration(milliseconds: 350));
-
-    first.isMatched.value = true;
-    second.isMatched.value = true;
-    matchesFound.value++;
-    _handleMatch();
-    score.value = math.max(0, score.value - _autoMatchPenalty);
-    SoundService.playMatch();
-
-    _isProcessing = false;
-    _checkWin();
   }
 
   Future<void> usePowerUp(PowerUpType type) async {
@@ -410,6 +319,7 @@ class GameController extends GetxController {
       _firstSelectedCard!.isMatched.value = true;
       secondCard.isMatched.value = true;
       matchesFound.value++;
+      wrongAttempts.value = 0;
 
       _handleMatch();
       SoundService.playMatch();
@@ -427,7 +337,20 @@ class GameController extends GetxController {
 
       wrongAttempts.value++;
       _wrongAttemptsThisGame++;
-      if (wrongAttempts.value >= _failSoundAttemptThreshold) {
+      if (_wrongAttemptsThisGame.isEven) {
+        final isOutOfHearts = await progression.loseHeart();
+        if (isOutOfHearts) {
+          await Future.delayed(const Duration(milliseconds: 300));
+          _firstSelectedCard!.isFlipped.value = false;
+          secondCard.isFlipped.value = false;
+          _firstSelectedCard!.isWrong.value = false;
+          secondCard.isWrong.value = false;
+          _firstSelectedCard = null;
+          _loseGame();
+          return;
+        }
+      }
+      if (wrongAttempts.value == _failSoundAttemptThreshold) {
         wrongAttempts.value = 0;
         SoundService.playFail();
       } else {
@@ -475,7 +398,7 @@ class GameController extends GetxController {
   void _startCooldown(
     RxInt target,
     void Function(Timer timer) storeTimer, {
-    int seconds = _assistCooldownSeconds,
+    int seconds = _powerUpCooldownSeconds,
   }) {
     target.value = seconds;
     late Timer timer;
@@ -512,13 +435,14 @@ class GameController extends GetxController {
   }
 
   void _checkWin() {
-    if (matchesFound.value ==
-        (level.value.gridSize * level.value.gridSize) ~/ 2) {
+    if (matchesFound.value == level.value.pairsCount) {
       _winGame();
     }
   }
 
   void _handleMatch() {
+    wrongAttempts.value = 0;
+
     final now = DateTime.now();
     if (_lastMatchTime != null) {
       final difference = now.difference(_lastMatchTime!).inSeconds;
@@ -573,7 +497,6 @@ class GameController extends GetxController {
   @override
   void onClose() {
     _timer?.cancel();
-    _hintCooldownTimer?.cancel();
     _autoMatchCooldownTimer?.cancel();
     _revealCooldownTimer?.cancel();
     _slowTimeCooldownTimer?.cancel();

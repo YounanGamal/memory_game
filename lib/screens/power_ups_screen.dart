@@ -7,11 +7,16 @@ import '../core/enums/game_enums.dart';
 import '../theme/app_colors.dart';
 
 class PowerUpsScreen extends StatelessWidget {
-  const PowerUpsScreen({super.key});
+  final GameMode mode;
+
+  const PowerUpsScreen({super.key, this.mode = GameMode.classic});
 
   @override
   Widget build(BuildContext context) {
     final progression = Get.find<ProgressionController>();
+    final powerUps = PowerUpType.values.where((type) {
+      return mode == GameMode.timeAttack || type != PowerUpType.slowTime;
+    }).toList();
 
     return Obx(
       () => Scaffold(
@@ -53,10 +58,19 @@ class PowerUpsScreen extends StatelessWidget {
                 const SizedBox(height: 22),
                 Expanded(
                   child: ListView.separated(
-                    itemCount: PowerUpType.values.length,
+                    itemCount: powerUps.length + 1,
                     separatorBuilder: (_, _) => const SizedBox(height: 12),
                     itemBuilder: (context, index) {
-                      final type = PowerUpType.values[index];
+                      if (index == 0) {
+                        return _HeartCard(
+                          hearts: progression.hearts.value,
+                          canBuy: progression.canBuyHeart,
+                          onBuy: () => progression.buyHeart(),
+                        );
+                      }
+
+                      final powerUpIndex = index - 1;
+                      final type = powerUps[powerUpIndex];
                       return _PowerUpCard(
                         type: type,
                         owned: progression.countFor(type),
@@ -70,6 +84,84 @@ class PowerUpsScreen extends StatelessWidget {
             ),
           ),
         ),
+      ),
+    );
+  }
+}
+
+class _HeartCard extends StatelessWidget {
+  final int hearts;
+  final bool canBuy;
+  final VoidCallback onBuy;
+
+  const _HeartCard({
+    required this.hearts,
+    required this.canBuy,
+    required this.onBuy,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final isFull = hearts >= ProgressionController.maxHearts;
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: AppColors.white,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: AppColors.border),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 52,
+            height: 52,
+            decoration: BoxDecoration(
+              color: Colors.redAccent.withValues(alpha: 0.11),
+              shape: BoxShape.circle,
+            ),
+            child: const Icon(Icons.favorite_rounded, color: Colors.redAccent),
+          ),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Heart',
+                  style: GoogleFonts.outfit(
+                    color: AppColors.textDark,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 16,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  isFull ? 'Hearts are full.' : 'Buy 1 heart to keep playing.',
+                  style: GoogleFonts.outfit(
+                    color: AppColors.textGrey,
+                    fontSize: 12,
+                  ),
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  'Hearts: $hearts/${ProgressionController.maxHearts}',
+                  style: GoogleFonts.outfit(
+                    color: AppColors.accentPink,
+                    fontWeight: FontWeight.w700,
+                    fontSize: 12,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 10),
+          FilledButton.icon(
+            onPressed: canBuy ? onBuy : null,
+            icon: const Icon(Icons.favorite_rounded, size: 17),
+            label: Text('${ProgressionController.heartCost}'),
+          ),
+        ],
       ),
     );
   }

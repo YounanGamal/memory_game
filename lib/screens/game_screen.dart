@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:get/get.dart';
@@ -37,6 +39,9 @@ class _GameScreenState extends State<GameScreen> {
   void _showEndDialog({required bool didWin}) {
     if (Get.isDialogOpen == true) return;
 
+    final isOutOfHearts = !didWin && controller.progression.hearts.value <= 0;
+    final nextLevel = didWin ? controller.level.value.nextLevel : null;
+
     Get.dialog(
       Dialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
@@ -52,7 +57,11 @@ class _GameScreenState extends State<GameScreen> {
               ResultVideoWidget(isSuccess: didWin),
               const SizedBox(height: 16),
               Text(
-                didWin ? 'Congratulations!' : 'Time is up',
+                didWin
+                    ? 'Congratulations!'
+                    : isOutOfHearts
+                    ? 'Game Over'
+                    : 'Time is up',
                 style: GoogleFonts.outfit(
                   fontSize: 24,
                   fontWeight: FontWeight.bold,
@@ -63,6 +72,8 @@ class _GameScreenState extends State<GameScreen> {
               Text(
                 didWin
                     ? 'You cleared the board!'
+                    : isOutOfHearts
+                    ? 'You ran out of hearts.'
                     : 'Try again and move faster.',
                 textAlign: TextAlign.center,
                 style: GoogleFonts.outfit(color: AppColors.textGrey),
@@ -72,48 +83,89 @@ class _GameScreenState extends State<GameScreen> {
                 _buildRewardSummary(controller.lastReward.value!),
                 const SizedBox(height: 16),
               ],
-              _buildResultRow(
-                controller.isTimeAttack ? 'Time Left' : 'Time',
-                _formatTime(
-                  controller.isTimeAttack
-                      ? controller.remainingSeconds.value
-                      : controller.secondsElapsed.value,
-                ),
-              ),
-              const SizedBox(height: 12),
-              _buildResultRow('Moves', '${controller.moves.value}'),
-              const SizedBox(height: 12),
-              _buildResultRow('Best Combo', 'x${controller.bestCombo.value}'),
-              const SizedBox(height: 12),
-              _buildResultRow(
-                'Final Score',
-                '${controller.score.value}',
-                isHighlight: true,
-              ),
-              const SizedBox(height: 32),
-              GestureDetector(
-                onTap: () {
-                  Get.back();
-                  Get.back();
-                },
-                child: Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.symmetric(vertical: 16),
-                  decoration: BoxDecoration(
-                    gradient: AppColors.primaryGradient,
-                    borderRadius: BorderRadius.circular(15),
-                  ),
-                  child: Center(
-                    child: Text(
-                      didWin ? 'PLAY AGAIN' : 'TRY AGAIN',
-                      style: GoogleFonts.outfit(
-                        fontWeight: FontWeight.bold,
-                        color: Colors.white,
-                      ),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  _buildResultRow(
+                    controller.isTimeAttack ? 'Time Left' : 'Time',
+                    _formatTime(
+                      controller.isTimeAttack
+                          ? controller.remainingSeconds.value
+                          : controller.secondsElapsed.value,
                     ),
                   ),
-                ),
+                  const SizedBox(height: 12),
+                  _buildResultRow('Moves', '${controller.moves.value}'),
+                  const SizedBox(height: 12),
+                  _buildResultRow('Best Combo', 'x${controller.bestCombo.value}'),
+                  const SizedBox(height: 12),
+                  _buildResultRow(
+                    'Final Score',
+                    '${controller.score.value}',
+                    isHighlight: true,
+                  ),
+                ],
               ),
+
+              const SizedBox(height: 32),
+              if (isOutOfHearts) ...[
+                _buildDialogAction(
+                  label: 'BUY HEART - 50',
+                  icon: Icons.favorite_rounded,
+                  enabled: controller.progression.canBuyHeart,
+                  onTap: () async {
+                    final bought = await controller.progression.buyHeart();
+                    if (!bought) return;
+                    Get.back();
+                    controller.startGame(
+                      controller.level.value,
+                      controller.mode.value,
+                    );
+                  },
+                ),
+                const SizedBox(height: 10),
+                _buildDialogAction(
+                  label: 'RESTART FROM LEVEL 1',
+                  icon: Icons.refresh_rounded,
+                  onTap: () async {
+                    await controller.progression.restartRun(
+                      controller.mode.value,
+                    );
+                    Get.back();
+                    controller.startGame(
+                      controller.mode.value.firstLevel,
+                      controller.mode.value,
+                    );
+                  },
+                ),
+              ] else
+                _buildDialogAction(
+                  label: didWin
+                      ? nextLevel == null
+                            ? 'BACK TO LEVELS'
+                            : 'CONTINUE LEVEL ${nextLevel.number}'
+                      : 'TRY AGAIN',
+                  icon: didWin
+                      ? nextLevel == null
+                            ? Icons.grid_view_rounded
+                            : Icons.play_arrow_rounded
+                      : Icons.refresh_rounded,
+                  onTap: () {
+                    Get.back();
+                    if (didWin) {
+                      if (nextLevel == null) {
+                        Get.back();
+                      } else {
+                        controller.startGame(nextLevel, controller.mode.value);
+                      }
+                    } else {
+                      controller.startGame(
+                        controller.level.value,
+                        controller.mode.value,
+                      );
+                    }
+                  },
+                ),
             ],
           ),
         ),
@@ -122,15 +174,54 @@ class _GameScreenState extends State<GameScreen> {
     );
   }
 
+  Widget _buildDialogAction({
+    required String label,
+    required IconData icon,
+    required VoidCallback onTap,
+    bool enabled = true,
+  }) {
+    return GestureDetector(
+      onTap: enabled ? onTap : null,
+      child: AnimatedOpacity(
+        duration: const Duration(milliseconds: 180),
+        opacity: enabled ? 1 : 0.45,
+        child: Container(
+          width: double.infinity,
+          padding: const EdgeInsets.symmetric(vertical: 16),
+          decoration: BoxDecoration(
+            gradient: enabled ? AppColors.primaryGradient : null,
+            color: enabled ? null : AppColors.border,
+            borderRadius: BorderRadius.circular(15),
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(icon, color: Colors.white, size: 18),
+              const SizedBox(width: 8),
+              Text(
+                label,
+                style: GoogleFonts.outfit(
+                  fontWeight: FontWeight.bold,
+                  color: Colors.white,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   Widget _buildResultRow(
     String label,
     String value, {
     bool isHighlight = false,
   }) {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+    return Column(
+      // mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
         Text(label, style: GoogleFonts.outfit(color: AppColors.textGrey)),
+        SizedBox(height: 8,),
         Text(
           value,
           style: GoogleFonts.outfit(
@@ -242,7 +333,8 @@ class _GameScreenState extends State<GameScreen> {
               const SizedBox(width: 10),
               _buildCircleAction(
                 icon: Icons.shopping_basket_rounded,
-                onTap: () => Get.to(() => const PowerUpsScreen()),
+                onTap: () =>
+                    Get.to(() => PowerUpsScreen(mode: controller.mode.value)),
                 iconColor: AppColors.accentPink,
               ),
             ],
@@ -272,8 +364,24 @@ class _GameScreenState extends State<GameScreen> {
                     ),
                   ),
                   const SizedBox(height: 4),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.end,
+                    children: List.generate(
+                      5,
+                      (index) => Icon(
+                        index < controller.progression.hearts.value
+                            ? Icons.favorite_rounded
+                            : Icons.favorite_border_rounded,
+                        color: index < controller.progression.hearts.value
+                            ? Colors.redAccent
+                            : AppColors.textGrey,
+                        size: 16,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 4),
                   Text(
-                    'PROGRESS: ${controller.matchesFound.value}/${(controller.level.value.gridSize * controller.level.value.gridSize) ~/ 2}',
+                    'PROGRESS: ${controller.matchesFound.value}/${controller.level.value.pairsCount}',
                     overflow: TextOverflow.ellipsis,
                     style: GoogleFonts.outfit(
                       fontSize: screenWidth < 380 ? 11 : 12,
@@ -321,15 +429,20 @@ class _GameScreenState extends State<GameScreen> {
         padding: const EdgeInsets.symmetric(horizontal: 18),
         child: Row(
           mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-          children: PowerUpType.values.map((type) {
-            return _buildPowerUpButton(
-              type: type,
-              count: controller.progression.countFor(type),
-              cooldown: _powerUpCooldown(controller, type),
-              isEnabled: controller.canUsePowerUp(type),
-              onTap: () => controller.usePowerUp(type),
-            );
-          }).toList(),
+          children: PowerUpType.values
+              .where((type) {
+                return controller.isTimeAttack || type != PowerUpType.slowTime;
+              })
+              .map((type) {
+                return _buildPowerUpButton(
+                  type: type,
+                  count: controller.progression.countFor(type),
+                  cooldown: _powerUpCooldown(controller, type),
+                  isEnabled: controller.canUsePowerUp(type),
+                  onTap: () => controller.usePowerUp(type),
+                );
+              })
+              .toList(),
         ),
       );
     });
@@ -443,30 +556,55 @@ class _GameScreenState extends State<GameScreen> {
     return Stack(
       children: [
         Obx(() {
-          int gridSize = controller.level.value.gridSize;
-          final spacing = gridSize >= 6 ? 6.0 : (gridSize >= 4 ? 12.0 : 16.0);
-          final horizontalPadding = gridSize >= 6 ? 12.0 : 24.0;
-          final childAspectRatio = gridSize >= 6 ? 0.93 : 1.0;
+          final level = controller.level.value;
+          final columns = level.columns;
+          final rows = level.rows;
+          final spacing = level.totalCards >= 36
+              ? 5.0
+              : level.totalCards >= 20
+              ? 7.0
+              : 12.0;
+          final horizontalPadding = level.totalCards >= 36 ? 10.0 : 20.0;
+
           return Padding(
             padding: EdgeInsets.symmetric(horizontal: horizontalPadding),
-            child: Center(
-              child: GridView.builder(
-                shrinkWrap: true,
-                physics: const NeverScrollableScrollPhysics(),
-                gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                  crossAxisCount: gridSize,
-                  crossAxisSpacing: spacing,
-                  mainAxisSpacing: spacing,
-                  childAspectRatio: childAspectRatio,
-                ),
-                itemCount: controller.cards.length,
-                itemBuilder: (context, index) {
-                  return MemoryCardWidget(
-                    card: controller.cards[index],
-                    onTap: () => controller.onCardTap(controller.cards[index]),
-                  );
-                },
-              ),
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                final availableWidth =
+                    constraints.maxWidth - (spacing * (columns - 1));
+                final availableHeight =
+                    constraints.maxHeight - (spacing * (rows - 1));
+                final cardSize = math.min(
+                  availableWidth / columns,
+                  availableHeight / rows,
+                );
+                final boardWidth =
+                    (cardSize * columns) + (spacing * (columns - 1));
+                final boardHeight = (cardSize * rows) + (spacing * (rows - 1));
+
+                return Center(
+                  child: SizedBox(
+                    width: boardWidth,
+                    height: boardHeight,
+                    child: GridView.builder(
+                      physics: const NeverScrollableScrollPhysics(),
+                      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                        crossAxisCount: columns,
+                        crossAxisSpacing: spacing,
+                        mainAxisSpacing: spacing,
+                      ),
+                      itemCount: controller.cards.length,
+                      itemBuilder: (context, index) {
+                        return MemoryCardWidget(
+                          card: controller.cards[index],
+                          onTap: () =>
+                              controller.onCardTap(controller.cards[index]),
+                        );
+                      },
+                    ),
+                  ),
+                );
+              },
             ),
           );
         }),

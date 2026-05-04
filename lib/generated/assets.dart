@@ -27,8 +27,7 @@ class $AssetsIconGen {
 
   final AssetGenImage appIcon = const AssetGenImage('assets/icon/app_icon.png');
   final AssetGenImage appIconForeground = const AssetGenImage(
-    'assets/icon/app_icon_foreground.png',
-  );
+      'assets/icon/app_icon_foreground.png');
 }
 
 class $AssetsVideoGen {
@@ -37,12 +36,14 @@ class $AssetsVideoGen {
   final String fail1 = 'assets/video/fail1.mp4';
   final String success1 = 'assets/video/success1.mp4';
   final String success2 = 'assets/video/success2.mp4';
+  final String success3 = 'assets/video/success3.mp4';
 }
 
 class AssetGenImage {
   const AssetGenImage(this._assetName, {this.size, this.flavors = const {}});
 
   final String _assetName;
+
 
   final Size? size;
   final Set<String> flavors;
@@ -100,8 +101,15 @@ class AssetGenImage {
     );
   }
 
-  ImageProvider provider({AssetBundle? bundle, String? package}) {
-    return AssetImage(_assetName, bundle: bundle, package: package);
+  ImageProvider provider({
+    AssetBundle? bundle,
+    String? package,
+  }) {
+    return AssetImage(
+      _assetName,
+      bundle: bundle,
+      package: package,
+    );
   }
 
   Widget custom({
@@ -118,3 +126,4 @@ class AssetGenImage {
 
   String get keyName => _assetName;
 }
+

@@ -4,7 +4,6 @@ import 'package:flutter/services.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:get/get.dart';
 import '../models/card_model.dart';
-import '../theme/app_colors.dart';
 import '../theme/card_styles.dart';
 
 class MemoryCardWidget extends StatelessWidget {
@@ -104,7 +103,7 @@ class MemoryCardWidget extends StatelessWidget {
           )
           .shimmer(
             duration: 1200.ms,
-            color: AppColors.primaryPink.withValues(alpha: 0.2),
+            color: CardStyles.accentColor.withValues(alpha: 0.2),
           );
     }
 
