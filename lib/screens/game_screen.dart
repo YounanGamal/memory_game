@@ -7,6 +7,7 @@ import '../controllers/theme_controller.dart';
 import '../core/enums/game_enums.dart';
 import '../theme/app_colors.dart';
 import '../widgets/memory_card_widget.dart';
+import '../widgets/result_video_widget.dart';
 
 class GameScreen extends StatefulWidget {
   const GameScreen({super.key});
@@ -38,7 +39,7 @@ class _GameScreenState extends State<GameScreen> {
       Dialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
         child: Container(
-          padding: const EdgeInsets.all(32),
+          padding: const EdgeInsets.symmetric(horizontal: 20,vertical: 16),
           decoration: BoxDecoration(
             color: AppColors.white,
             borderRadius: BorderRadius.circular(30),
@@ -46,7 +47,7 @@ class _GameScreenState extends State<GameScreen> {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Text(didWin ? '🎉' : '⏱️', style: const TextStyle(fontSize: 64)),
+              ResultVideoWidget(isSuccess: didWin),
               const SizedBox(height: 16),
               Text(
                 didWin ? 'Congratulations!' : 'Time is up',

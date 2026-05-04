@@ -1,9 +1,11 @@
+import 'dart:math';
 import 'package:audioplayers/audioplayers.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 
 class SoundService {
   static final Map<String, AudioPlayer> _players = {};
+  static final Random _random = Random();
 
   static Future<void> _play(String file, double volume) async {
     try {
@@ -27,7 +29,13 @@ class SoundService {
   }
 
   static Future<void> playWrong() async {
-    await _play('fail.mp3', 0.6);
+    final int randomIndex = _random.nextInt(3) + 1; // 1, 2, or 3
+    await _play('fail$randomIndex.mp3', 0.6);
+    HapticFeedback.heavyImpact();
+  }
+
+  static Future<void> playFail() async {
+    await _play('fail.mp3', 0.8);
     HapticFeedback.heavyImpact();
   }
 

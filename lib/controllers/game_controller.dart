@@ -23,6 +23,7 @@ class GameController extends GetxController {
   final RxInt autoMatchesLeft = 0.obs;
   final RxInt hintCooldown = 0.obs;
   final RxInt autoMatchCooldown = 0.obs;
+  final RxInt wrongAttempts = 0.obs;
 
   DateTime? _lastMatchTime;
   Timer? _timer;
@@ -35,6 +36,7 @@ class GameController extends GetxController {
   static const int _comboThresholdSeconds = 5;
   static const int _assistCooldownSeconds = 3;
   static const int _autoMatchPenalty = 50;
+  static const int _failSoundAttemptThreshold = 3;
 
   bool get isTimeAttack => mode.value == GameMode.timeAttack;
   bool get hasAssists => mode.value == GameMode.assist;
@@ -52,106 +54,48 @@ class GameController extends GetxController {
       autoMatchCooldown.value == 0;
 
   final List<String> _emojiPool = [
-    '🐶',
-    '🐱',
-    '🐭',
-    '🐹',
-    '🐰',
-    '🦊',
-    '🐻',
-    '🐼',
-    '🐨',
-    '🐯',
-    '🦁',
-    '🐮',
-    '🐷',
-    '🐸',
-    '🐵',
-    '🐔',
-    '🐧',
-    '🐦',
-    '🐤',
-    '🦆',
-    '🦅',
-    '🦉',
-    '🦇',
-    '🐺',
-    '🐗',
-    '🐴',
-    '🦄',
-    '🐝',
-    '🐛',
-    '🦋',
-    '🐌',
-    '🐞',
-    '🐜',
-    '🦟',
-    '🐢',
-    '🐍',
-    '🦎',
-    '🦖',
-    '🦕',
-    '🐙',
-    '🦑',
-    '🦐',
-    '🦞',
-    '🦀',
-    '🐡',
-    '🐠',
-    '🐟',
-    '🐬',
-    '🐳',
-    '🐋',
-    '🦈',
-    '🐊',
-    '🐅',
-    '🐆',
-    '🦓',
-    '🦍',
-    '🦧',
-    '🐘',
-    '🦛',
-    '🦏',
-    '🐪',
-    '🐫',
-    '🦒',
-    '🦘',
-    '🐃',
-    '🐂',
-    '🐄',
-    '🐎',
-    '🐖',
-    '🐏',
-    '🐑',
-    '🐐',
-    '🦌',
-    '🐕',
-    '🐩',
-    '🐈',
-    '🐓',
-    '🦃',
-    '🦚',
-    '🦜',
-    '🦢',
-    '🦩',
-    '🕊',
-    '🐇',
-    '🦝',
-    '🦨',
-    '🦡',
-    '🦦',
-    '🦥',
-    '🐁',
-    '🐀',
-    '🐿',
-    '🦔',
-    '🐾',
-    '🐉',
-    '🐲',
-    '🌵',
-    '🎄',
-    '🌲',
-    '🌳',
+    // Animals
+    '🐶', '🐱', '🐭', '🐹', '🐰', '🦊', '🐻', '🐼', '🐨', '🐯',
+    '🦁', '🐮', '🐷', '🐸', '🐵', '🐔', '🐧', '🐦', '🐤', '🦆',
+    '🦅', '🦉', '🦇', '🐺', '🐗', '🐴', '🦄', '🐝', '🐛', '🦋',
+    '🐌', '🐞', '🐜', '🦟', '🐢', '🐍', '🦎', '🦖', '🦕', '🐙',
+    '🦑', '🦐', '🦞', '🦀', '🐡', '🐠', '🐟', '🐬', '🐳', '🐋',
+    '🦈', '🐊', '🐅', '🐆', '🦓', '🦍', '🦧', '🐘', '🦛', '🦏',
+    '🐪', '🐫', '🦒', '🦘', '🐃', '🐂', '🐄', '🐎', '🐖', '🐏',
+    '🐑', '🐐', '🦌', '🐕', '🐩', '🐈', '🐓', '🦃', '🦚', '🦜',
+    '🦢', '🦩', '🕊', '🐇', '🦝', '🦨', '🦡', '🦦', '🦥', '🐁',
+    '🐀', '🐿', '🦔', '🐾', '🐉', '🐲',
+
+    // Food
+    '🍎', '🍌', '🍇', '🍉', '🍓', '🍒', '🍑', '🍍', '🥭', '🥝',
+    '🍅', '🥥', '🥑', '🍆', '🥔', '🥕', '🌽', '🌶', '🥒', '🥬',
+    '🥦', '🍄', '🥜', '🍞', '🥐', '🥖', '🥨', '🥯', '🥞', '🧇',
+    '🧀', '🍗', '🍖', '🌭', '🍔', '🍟', '🍕', '🥪', '🥙', '🌮',
+    '🌯', '🥗', '🍝', '🍜', '🍲', '🍛', '🍣', '🍤', '🍱', '🥟',
+    '🍦', '🍩', '🍪', '🎂', '🍰', '🧁', '🍫', '🍬', '🍭', '🍮',
+
+    // Faces
+    '😀', '😃', '😄', '😁', '😆', '😅', '😂', '🤣', '😊', '😇',
+    '🙂', '🙃', '😉', '😌', '😍', '🥰', '😘', '😗', '😙', '😚',
+    '😜', '🤪', '🤨', '🧐', '🤓', '😎', '🥳', '😤', '😡', '😭',
+
+    // Tech
+    '💻', '🖥', '🖨', '⌨️', '🖱', '📱', '📲', '☎️', '📞', '📡',
+    '📺', '🎮', '🕹', '💾', '💿', '📀', '🔋', '🔌', '💡', '🔦',
+
+    // Sports
+    '⚽', '🏀', '🏈', '⚾', '🎾', '🏐', '🏉', '🎱', '🏓', '🏸',
+    '🥅', '🏒', '🏑', '🥊', '🥋', '🎯', '⛳', '🏹', '🛹', '🛼',
+
+    // Vehicles
+    '🚗', '🚕', '🚙', '🚌', '🚎', '🏎', '🚓', '🚑', '🚒', '🚐',
+    '🚚', '🚛', '🚜', '🛵', '🏍', '🚲', '🛴', '✈️', '🚀', '🛸',
+    '🚁', '⛵', '🚤', '🛳', '🚢', '🚂', '🚆', '🚇', '🚊', '🚝',
+
+    // Random
+    '💎', '🔥', '⭐', '🌟', '✨', '⚡', '🌈', '☀️', '🌙', '☁️',
+    '❄️', '☔', '🌊', '🍀', '🌹', '🌻', '🌼', '🌷', '🌺', '🪷',
+    '🎁', '🎈', '🎉', '🎊', '🏆', '🥇', '🥈', '🥉', '🎵', '🎶',
   ];
 
   void startGame(
@@ -177,6 +121,7 @@ class GameController extends GetxController {
     autoMatchesLeft.value = selectedMode == GameMode.assist ? 1 : 0;
     hintCooldown.value = 0;
     autoMatchCooldown.value = 0;
+    wrongAttempts.value = 0;
     _lastMatchTime = null;
     _firstSelectedCard = null;
     _isProcessing = false;
@@ -231,8 +176,9 @@ class GameController extends GetxController {
   }
 
   Future<void> useHint() async {
-    if (!canUseHint || state.value != GameState.playing || _isProcessing)
+    if (!canUseHint || state.value != GameState.playing || _isProcessing) {
       return;
+    }
 
     hintsLeft.value--;
     _startCooldown(hintCooldown, (timer) => _hintCooldownTimer = timer);
@@ -261,11 +207,14 @@ class GameController extends GetxController {
   }
 
   Future<void> useAutoMatch() async {
-    if (!canUseAutoMatch || state.value != GameState.playing || _isProcessing)
+    if (!canUseAutoMatch || state.value != GameState.playing || _isProcessing) {
       return;
+    }
 
     final pair = _findUnmatchedPair();
-    if (pair == null) return;
+    if (pair == null) {
+      return;
+    }
 
     autoMatchesLeft.value--;
     if (autoMatchesLeft.value > 0) {
@@ -321,7 +270,13 @@ class GameController extends GetxController {
       secondCard.isWrong.value = true;
       combo.value = 1; // Reset combo on mismatch
 
-      SoundService.playWrong();
+      wrongAttempts.value++;
+      if (wrongAttempts.value >= _failSoundAttemptThreshold) {
+        wrongAttempts.value = 0;
+        SoundService.playFail();
+      } else {
+        SoundService.playWrong();
+      }
 
       await Future.delayed(const Duration(milliseconds: 600));
 

@@ -12,7 +12,7 @@ enum GameMode {
 }
 
 enum GameLevel {
-  easy(gridSize: 2, previewDuration: 3, timeLimit: 60),
+  easy(gridSize: 2, previewDuration: 3, timeLimit: 15),
   medium(gridSize: 4, previewDuration: 2, timeLimit: 90),
   hard(gridSize: 6, previewDuration: 1, timeLimit: 120);
 
