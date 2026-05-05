@@ -48,7 +48,10 @@ class MemoryCardWidget extends StatelessWidget {
                 ..setEntry(3, 2, 0.001) // Perspective
                 ..rotateY(angle * pi / 180),
               alignment: Alignment.center,
-              child: cardContent,
+              child: Padding(
+                padding: const EdgeInsets.all(1.5),
+                child: cardContent,
+              ),
             );
           },
         ),

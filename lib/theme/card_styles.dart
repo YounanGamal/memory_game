@@ -50,25 +50,29 @@ class CardStyles {
   static BoxDecoration get openDecoration => BoxDecoration(
     color: AppColors.white,
     borderRadius: BorderRadius.circular(borderRadius),
-    border: Border.all(color: AppColors.border),
+    border: Border.all(color: AppColors.border.withValues(alpha: 0.6)),
     boxShadow: [
       BoxShadow(
-        color: Colors.black.withValues(alpha: 0.05),
-        blurRadius: 10,
+        color: Colors.black.withValues(alpha: 0.04),
+        blurRadius: 8,
         offset: const Offset(0, 2),
       ),
     ],
   );
 
   static BoxDecoration get matchedDecoration => BoxDecoration(
-    color: AppColors.white,
+    gradient: LinearGradient(
+      colors: themeColors.map((c) => c.withValues(alpha: 0.15)).toList(),
+      begin: Alignment.topLeft,
+      end: Alignment.bottomRight,
+    ),
     borderRadius: BorderRadius.circular(borderRadius),
-    border: Border.all(color: accentColor.withValues(alpha: 0.35), width: 2),
+    border: Border.all(color: accentColor.withValues(alpha: 0.4), width: 2),
     boxShadow: [
       BoxShadow(
-        color: accentColor.withValues(alpha: 0.16),
-        blurRadius: 15,
-        spreadRadius: 2,
+        color: accentColor.withValues(alpha: 0.12),
+        blurRadius: 12,
+        spreadRadius: 1,
       ),
     ],
   );

@@ -44,7 +44,7 @@ class LevelCard extends StatelessWidget {
           onTap: isUnlocked ? onTap : null,
           child: AnimatedContainer(
             duration: const Duration(milliseconds: 240),
-            padding: const EdgeInsets.all(12),
+            padding: const EdgeInsets.all(10),
             decoration: BoxDecoration(
               gradient: gradient,
               borderRadius: BorderRadius.circular(16),

@@ -313,13 +313,14 @@ class GameController extends GetxController {
   void _compareCards(CardModel secondCard) async {
     _isProcessing = true;
     moves.value++;
-
     if (_firstSelectedCard!.value == secondCard.value) {
       // Match!
       _firstSelectedCard!.isMatched.value = true;
       secondCard.isMatched.value = true;
       matchesFound.value++;
+
       wrongAttempts.value = 0;
+      _wrongAttemptsThisGame = 0; // 🔥 الحل هنا
 
       _handleMatch();
       SoundService.playMatch();
@@ -328,7 +329,20 @@ class GameController extends GetxController {
       _isProcessing = false;
 
       _checkWin();
-    } else {
+    }
+    // if (_firstSelectedCard!.value == secondCard.value) {
+    //   // Match!
+    //   _firstSelectedCard!.isMatched.value = true;
+    //   secondCard.isMatched.value = true;
+    //   matchesFound.value++;
+    //   wrongAttempts.value = 0;
+    //   _handleMatch();
+    //   SoundService.playMatch();
+    //   _firstSelectedCard = null;
+    //   _isProcessing = false;
+    //   _checkWin();
+    // }
+    else {
       // No match
       state.value = GameState.comparing;
       _firstSelectedCard!.isWrong.value = true;
@@ -337,6 +351,7 @@ class GameController extends GetxController {
 
       wrongAttempts.value++;
       _wrongAttemptsThisGame++;
+
       if (_wrongAttemptsThisGame.isEven) {
         final isOutOfHearts = await progression.loseHeart();
         if (isOutOfHearts) {
@@ -350,7 +365,7 @@ class GameController extends GetxController {
           return;
         }
       }
-      if (wrongAttempts.value == _failSoundAttemptThreshold) {
+      if (wrongAttempts.value >= _failSoundAttemptThreshold) {
         wrongAttempts.value = 0;
         SoundService.playFail();
       } else {

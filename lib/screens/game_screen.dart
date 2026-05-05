@@ -46,7 +46,7 @@ class _GameScreenState extends State<GameScreen> {
       Dialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
         child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 16),
           decoration: BoxDecoration(
             color: AppColors.white,
             borderRadius: BorderRadius.circular(30),
@@ -100,7 +100,7 @@ class _GameScreenState extends State<GameScreen> {
                   _buildResultRow('Best Combo', 'x${controller.bestCombo.value}'),
                   const SizedBox(height: 12),
                   _buildResultRow(
-                    'Final Score',
+                    'Score',
                     '${controller.score.value}',
                     isHighlight: true,
                   ),
@@ -221,7 +221,7 @@ class _GameScreenState extends State<GameScreen> {
       // mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
         Text(label, style: GoogleFonts.outfit(color: AppColors.textGrey)),
-        SizedBox(height: 8,),
+        SizedBox(height: 6,),
         Text(
           value,
           style: GoogleFonts.outfit(
