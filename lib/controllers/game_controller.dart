@@ -43,6 +43,7 @@ class GameController extends GetxController {
   int _previewToken = 0;
   int _timerTicks = 0;
   int _wrongAttemptsThisGame = 0;
+  int _consecutiveWrongForSound = 0;
 
   static const int _comboThresholdSeconds = 5;
   static const int _autoMatchPenalty = 50;
@@ -140,6 +141,7 @@ class GameController extends GetxController {
     _isProcessing = false;
     _timerTicks = 0;
     _wrongAttemptsThisGame = 0;
+    _consecutiveWrongForSound = 0;
 
     // Start Preview
     state.value = GameState.preview;
@@ -320,7 +322,8 @@ class GameController extends GetxController {
       matchesFound.value++;
 
       wrongAttempts.value = 0;
-      _wrongAttemptsThisGame = 0; // 🔥 الحل هنا
+      _wrongAttemptsThisGame = 0;
+      _consecutiveWrongForSound = 0;
 
       _handleMatch();
       SoundService.playMatch();
@@ -351,7 +354,9 @@ class GameController extends GetxController {
 
       wrongAttempts.value++;
       _wrongAttemptsThisGame++;
+      _consecutiveWrongForSound++;
 
+      // ❤️ Lose a heart every 2 cumulative wrong attempts
       if (_wrongAttemptsThisGame.isEven) {
         final isOutOfHearts = await progression.loseHeart();
         if (isOutOfHearts) {
@@ -365,11 +370,11 @@ class GameController extends GetxController {
           return;
         }
       }
-      if (wrongAttempts.value >= _failSoundAttemptThreshold) {
-        wrongAttempts.value = 0;
+
+      // 🔊 Play fail sound ONLY at exactly 3 consecutive wrong attempts
+      if (_consecutiveWrongForSound == 3) {
         SoundService.playFail();
-      } else {
-        SoundService.playWrong();
+        _consecutiveWrongForSound = 0;
       }
 
       await Future.delayed(const Duration(milliseconds: 600));

@@ -1,13 +1,14 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:sliding_clipped_nav_bar/sliding_clipped_nav_bar.dart';
 
 import '../controllers/game_controller.dart';
 import '../controllers/progression_controller.dart';
 import '../controllers/theme_controller.dart';
 import '../core/enums/game_enums.dart';
 import '../theme/app_colors.dart';
-import '../widgets/start/game_bottom_nav.dart';
 import '../widgets/start/home_tab.dart';
 import '../widgets/start/levels_tab.dart';
 import '../widgets/start/stats_tab.dart';
@@ -49,29 +50,57 @@ class _StartScreenState extends State<StartScreen> {
           ),
           actions: [
             IconButton.filledTonal(
-              onPressed: () => Get.to(() => PowerUpsScreen(mode: _selectedMode)),
+              onPressed: () =>
+                  Get.to(() => PowerUpsScreen(mode: _selectedMode)),
               icon: const Icon(Icons.shopping_basket_rounded),
               color: AppColors.accentPink,
             ),
             const SizedBox(width: 10),
           ],
         ),
-        body: GameNavScaffold(
-          currentIndex: _tabIndex,
-          onChanged: (index) => setState(() => _tabIndex = index),
-          body: IndexedStack(
-            index: _tabIndex,
-            children: [
-              HomeTab(selectedMode: _selectedMode, onContinue: _startCurrentLevel),
-              LevelsTab(
-                selectedMode: _selectedMode,
-                onModeChanged: (mode) => setState(() => _selectedMode = mode),
-                onStartLevel: _startLevel,
-              ),
-              const StatsTab(),
-              ThemesTab(themeController: themeController),
-            ],
-          ),
+        body: IndexedStack(
+          index: _tabIndex,
+          children: [
+            HomeTab(
+                selectedMode: _selectedMode, onContinue: _startCurrentLevel),
+            LevelsTab(
+              selectedMode: _selectedMode,
+              onModeChanged: (mode) => setState(() => _selectedMode = mode),
+              onStartLevel: _startLevel,
+            ),
+            const StatsTab(),
+            ThemesTab(themeController: themeController),
+          ],
+        ),
+        bottomNavigationBar: SlidingClippedNavBar(
+          backgroundColor: AppColors.white,
+          onButtonPressed: (index) {
+            HapticFeedback.lightImpact();
+            setState(() {
+              _tabIndex = index;
+            });
+          },
+          iconSize: 22,
+          activeColor: AppColors.accentPink,
+          selectedIndex: _tabIndex,
+          barItems: [
+            BarItem(
+              icon: Icons.home_rounded,
+              title: 'Home',
+            ),
+            BarItem(
+              icon: Icons.sports_esports_rounded,
+              title: 'Levels',
+            ),
+            BarItem(
+              icon: Icons.bar_chart_rounded,
+              title: 'Stats',
+            ),
+            BarItem(
+              icon: Icons.palette_rounded,
+              title: 'Themes',
+            ),
+          ],
         ),
       ),
     );
